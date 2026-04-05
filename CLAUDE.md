@@ -98,12 +98,15 @@ type RecordStorage interface {
 
 ### Design Decisions
 1. **Storage is generic** - doesn't know about Entity/Spec/Status
-2. **No caching** - always hit database
+2. **No caching** - always hit database, for now. 
 3. **Type = group/version/kind** - single string
 4. **No UID** - key is Type+Tradespace+Name
 5. **Labels queryable** - stored and indexed
 6. **Data is opaque JSON** - storage doesn't parse it
 7. **Core schemas hardcoded** - bootstrap problem
+8. **Authentication** - For now, only TLS authentication, start the server with a specified (multiple?) certificate authorities. In the future we'll add more options.
+9. **Migrations** - Entity schemas are immutable, schema change = new version.
+
 
 ## Not Implemented Yet
 - [ ] gRPC API Server
@@ -124,3 +127,9 @@ go mod tidy         # Tidy dependencies
 - Go 1.22+
 - SQLite (modernc.org/sqlite - pure Go)
 - Future: PostgreSQL, Redis, gRPC
+
+
+TODOS:
+  1. Use a 3rd-party library for validation of OpenAPI3 Spec... 
+  2. Implement basic interface for stream storage. I think the initial base implementation could also benefit from sqlite, 
+       with concurrent reads to the database. This storage however should have much less options, only key-value set-get, prefix list(?maybe), and watch(prefix) 
