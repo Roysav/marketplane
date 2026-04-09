@@ -61,6 +61,9 @@ pkg/
 ├── entity/
 │   ├── types.go           # Entity, TypeMeta, ObjectMeta, GroupVersionKind
 │   └── types_test.go
+├── service/
+│   ├── service.go         # Business logic layer (CRUD, validation, events)
+│   └── service_test.go
 ├── storage/
 │   ├── storage.go         # RecordStorage interface
 │   ├── stream.go          # StreamStorage interface (timeseries)
@@ -75,7 +78,7 @@ pkg/
 │       ├── event.go       # Redis Streams implementation
 │       └── event_test.go
 └── validator/
-    ├── validator.go       # Schema validation
+    ├── validator.go       # Schema validation (gojsonschema)
     └── validator_test.go
 ```
 
@@ -120,7 +123,7 @@ type RecordStorage interface {
 ## Not Implemented Yet
 - [ ] gRPC API Server
 - [x] Redis (Stream storage, watches) ✓
-- [ ] Service layer
+- [x] Service layer ✓
 - [ ] RBAC
 - [ ] Allocation (cross-tradespace funds)
 - [ ] CLI
