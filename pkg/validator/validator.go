@@ -21,7 +21,7 @@ var (
 
 // coreSchemas holds JSON Schema definitions for built-in types.
 var coreSchemas = map[string]map[string]any{
-	"core/v1/RecordDefinition": {
+	"core/v1/MetaRecord": {
 		"type":     "object",
 		"required": []any{"group", "version", "kind", "storage"},
 		"properties": map[string]any{
@@ -84,9 +84,9 @@ func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
 		return validateWithSchema(schema, r.Spec)
 	}
 
-	// Look up RecordDefinition from storage
+	// Look up MetaRecord from storage
 	row, err := v.storage.Get(ctx, storage.Key{
-		Type:       "core/v1/RecordDefinition",
+		Type:       "core/v1/MetaRecord",
 		Tradespace: "default",
 		Name:       definitionName(r.TypeMeta.GVK()),
 	})
@@ -94,10 +94,10 @@ func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
 		return fmt.Errorf("%w: %s", ErrUnknownType, typeStr)
 	}
 
-	// Parse the RecordDefinition data
+	// Parse the MetaRecord data
 	var data map[string]any
 	if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
-		return fmt.Errorf("invalid RecordDefinition data: %w", err)
+		return fmt.Errorf("invalid MetaRecord data: %w", err)
 	}
 
 	schemaData, ok := data["schema"].(map[string]any)
@@ -119,7 +119,7 @@ func IsCoreType(typeStr string) bool {
 	return ok
 }
 
-// definitionName returns the RecordDefinition name for a GVK.
+// definitionName returns the MetaRecord name for a GVK.
 func definitionName(gvk record.GroupVersionKind) string {
 	return fmt.Sprintf("%s.%s", gvk.Kind, gvk.Group)
 }

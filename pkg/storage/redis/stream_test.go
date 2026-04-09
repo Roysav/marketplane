@@ -16,12 +16,13 @@ func TestStreamStorage(t *testing.T) {
 	defer client.Close()
 
 	// Clean up test keys
-	client.Do(ctx, "DEL", "ts:test/ticker")
+	client.Del(ctx, "stream:test/ticker")
 
 	s := NewStreamStorage(client)
 
 	t.Run("Add and Latest", func(t *testing.T) {
-		err := s.Add(ctx, "test/ticker", 100.5)
+		ts := time.Now()
+		err := s.Add(ctx, "test/ticker", ts, `{"bid": 100.5, "ask": 100.6}`)
 		if err != nil {
 			t.Fatalf("Add failed: %v", err)
 		}
@@ -34,18 +35,18 @@ func TestStreamStorage(t *testing.T) {
 		if entry.Key != "test/ticker" {
 			t.Errorf("expected key test/ticker, got %s", entry.Key)
 		}
-		if entry.Value != 100.5 {
-			t.Errorf("expected value 100.5, got %f", entry.Value)
+		if entry.Value != `{"bid": 100.5, "ask": 100.6}` {
+			t.Errorf("expected JSON value, got %s", entry.Value)
 		}
 	})
 
-	t.Run("AddAt with specific timestamp", func(t *testing.T) {
-		client.Do(ctx, "DEL", "ts:test/ticker2")
+	t.Run("Add with specific timestamp", func(t *testing.T) {
+		client.Del(ctx, "stream:test/ticker2")
 
 		ts := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-		err := s.AddAt(ctx, "test/ticker2", ts, 200.0)
+		err := s.Add(ctx, "test/ticker2", ts, `{"price": 200.0}`)
 		if err != nil {
-			t.Fatalf("AddAt failed: %v", err)
+			t.Fatalf("Add failed: %v", err)
 		}
 
 		entry, err := s.Latest(ctx, "test/ticker2")
@@ -53,22 +54,23 @@ func TestStreamStorage(t *testing.T) {
 			t.Fatalf("Latest failed: %v", err)
 		}
 
-		if entry.Value != 200.0 {
-			t.Errorf("expected value 200.0, got %f", entry.Value)
+		if entry.Value != `{"price": 200.0}` {
+			t.Errorf("expected JSON value, got %s", entry.Value)
 		}
-		if !entry.Timestamp.Equal(ts) {
+		// Timestamp should be within a second of what we set (millisecond precision in stream ID)
+		if entry.Timestamp.Sub(ts).Abs() > time.Second {
 			t.Errorf("expected timestamp %v, got %v", ts, entry.Timestamp)
 		}
 	})
 
 	t.Run("Range", func(t *testing.T) {
-		client.Do(ctx, "DEL", "ts:test/range")
+		client.Del(ctx, "stream:test/range")
 
 		base := time.Date(2024, 1, 1, 12, 0, 0, 0, time.UTC)
-		s.AddAt(ctx, "test/range", base, 1.0)
-		s.AddAt(ctx, "test/range", base.Add(time.Second), 2.0)
-		s.AddAt(ctx, "test/range", base.Add(2*time.Second), 3.0)
-		s.AddAt(ctx, "test/range", base.Add(3*time.Second), 4.0)
+		s.Add(ctx, "test/range", base, `{"v": 1}`)
+		s.Add(ctx, "test/range", base.Add(time.Second), `{"v": 2}`)
+		s.Add(ctx, "test/range", base.Add(2*time.Second), `{"v": 3}`)
+		s.Add(ctx, "test/range", base.Add(3*time.Second), `{"v": 4}`)
 
 		entries, err := s.Range(ctx, "test/range", base, base.Add(2*time.Second))
 		if err != nil {
@@ -79,7 +81,7 @@ func TestStreamStorage(t *testing.T) {
 			t.Fatalf("expected 3 entries, got %d", len(entries))
 		}
 
-		if entries[0].Value != 1.0 || entries[1].Value != 2.0 || entries[2].Value != 3.0 {
+		if entries[0].Value != `{"v": 1}` || entries[1].Value != `{"v": 2}` || entries[2].Value != `{"v": 3}` {
 			t.Errorf("unexpected values: %v", entries)
 		}
 	})
@@ -102,7 +104,7 @@ func TestStreamStorageWatch(t *testing.T) {
 	}
 	defer client.Close()
 
-	client.Do(ctx, "DEL", "ts:test/watch")
+	client.Del(ctx, "stream:test/watch")
 
 	s := NewStreamStorage(client)
 
@@ -112,11 +114,12 @@ func TestStreamStorageWatch(t *testing.T) {
 		t.Fatalf("Watch failed: %v", err)
 	}
 
-	// Give pubsub time to subscribe
+	// Give watcher time to start
 	time.Sleep(100 * time.Millisecond)
 
 	// Add a value
-	err = s.Add(ctx, "test/watch", 42.0)
+	ts := time.Now()
+	err = s.Add(ctx, "test/watch", ts, `{"event": "test"}`)
 	if err != nil {
 		t.Fatalf("Add failed: %v", err)
 	}
@@ -124,8 +127,8 @@ func TestStreamStorageWatch(t *testing.T) {
 	// Wait for event
 	select {
 	case event := <-watchCh:
-		if event.Entry.Value != 42.0 {
-			t.Errorf("expected value 42.0, got %f", event.Entry.Value)
+		if event.Entry.Value != `{"event": "test"}` {
+			t.Errorf("expected JSON value, got %s", event.Entry.Value)
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("timeout waiting for watch event")

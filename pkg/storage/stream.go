@@ -8,7 +8,7 @@ import (
 // StreamEntry is a data point in a timeseries.
 type StreamEntry struct {
 	Key       string
-	Value     float64
+	Value     string // JSON blob
 	Timestamp time.Time
 }
 
@@ -27,11 +27,8 @@ type WatchEvent struct {
 
 // StreamStorage provides timeseries storage with watch capability.
 type StreamStorage interface {
-	// Add appends a data point to the series (auto-timestamped).
-	Add(ctx context.Context, key string, value float64) error
-
-	// AddAt appends a data point with a specific timestamp.
-	AddAt(ctx context.Context, key string, ts time.Time, value float64) error
+	// Add appends a data point to the series with the given timestamp.
+	Add(ctx context.Context, key string, ts time.Time, value string) error
 
 	// Latest gets the most recent value for a key.
 	Latest(ctx context.Context, key string) (*StreamEntry, error)

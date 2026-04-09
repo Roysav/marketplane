@@ -3,7 +3,8 @@ package redis
 import (
 	"context"
 	"errors"
-	"strconv"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -13,66 +14,57 @@ import (
 
 var ErrNotFound = errors.New("key not found")
 
-// StreamStorage implements storage.StreamStorage using Redis TimeSeries.
+// StreamStorage implements storage.StreamStorage using Redis Streams.
 type StreamStorage struct {
 	client *redis.Client
 }
 
-// NewStreamStorage creates a StreamStorage backed by Redis TimeSeries.
+// NewStreamStorage creates a StreamStorage backed by Redis Streams.
 func NewStreamStorage(client *redis.Client) *StreamStorage {
 	return &StreamStorage{client: client}
 }
 
-func (s *StreamStorage) Add(ctx context.Context, key string, value float64) error {
-	return s.AddAt(ctx, key, time.Now(), value)
-}
+func (s *StreamStorage) Add(ctx context.Context, key string, ts time.Time, value string) error {
+	// Use user-provided timestamp as the stream ID
+	streamID := fmt.Sprintf("%d-*", ts.UnixMilli())
 
-func (s *StreamStorage) AddAt(ctx context.Context, key string, ts time.Time, value float64) error {
-	tsMillis := ts.UnixMilli()
-	_, err := s.client.Do(ctx, "TS.ADD", tsKey(key), tsMillis, value).Result()
-	if err != nil && isKeyNotFound(err) {
-		// Create the timeseries if it doesn't exist
-		_, err = s.client.Do(ctx, "TS.CREATE", tsKey(key)).Result()
-		if err != nil && !isKeyExists(err) {
-			return err
-		}
-		_, err = s.client.Do(ctx, "TS.ADD", tsKey(key), tsMillis, value).Result()
-	}
+	_, err := s.client.XAdd(ctx, &redis.XAddArgs{
+		Stream: timeseriesKey(key),
+		ID:     streamID,
+		Values: map[string]interface{}{
+			"data": value,
+			"ts":   ts.UnixNano(),
+		},
+	}).Result()
+
 	return err
 }
 
 func (s *StreamStorage) Latest(ctx context.Context, key string) (*storage.StreamEntry, error) {
-	result, err := s.client.Do(ctx, "TS.GET", tsKey(key)).Result()
+	result, err := s.client.XRevRangeN(ctx, timeseriesKey(key), "+", "-", 1).Result()
 	if err != nil {
-		if isKeyNotFound(err) || err == redis.Nil {
-			return nil, ErrNotFound
-		}
 		return nil, err
 	}
 
-	return parseTimeSeriesEntry(key, result)
+	if len(result) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return parseStreamMessage(key, result[0])
 }
 
 func (s *StreamStorage) Range(ctx context.Context, key string, from, to time.Time) ([]*storage.StreamEntry, error) {
-	fromMillis := from.UnixMilli()
-	toMillis := to.UnixMilli()
+	fromID := fmt.Sprintf("%d", from.UnixMilli())
+	toID := fmt.Sprintf("%d", to.UnixMilli())
 
-	result, err := s.client.Do(ctx, "TS.RANGE", tsKey(key), fromMillis, toMillis).Result()
+	result, err := s.client.XRange(ctx, timeseriesKey(key), fromID, toID).Result()
 	if err != nil {
-		if isKeyNotFound(err) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
-	items, ok := result.([]interface{})
-	if !ok {
-		return nil, nil
-	}
-
-	entries := make([]*storage.StreamEntry, 0, len(items))
-	for _, item := range items {
-		entry, err := parseTimeSeriesEntry(key, item)
+	entries := make([]*storage.StreamEntry, 0, len(result))
+	for _, msg := range result {
+		entry, err := parseStreamMessage(key, msg)
 		if err != nil {
 			continue
 		}
@@ -83,48 +75,57 @@ func (s *StreamStorage) Range(ctx context.Context, key string, from, to time.Tim
 }
 
 func (s *StreamStorage) Watch(ctx context.Context, prefix string) (<-chan storage.WatchEvent, error) {
-	// Redis TimeSeries doesn't have native pub/sub for new data points.
-	// We use keyspace notifications on the timeseries keys.
-	s.client.ConfigSet(ctx, "notify-keyspace-events", "KEA")
-
-	pattern := "__keyspace@*__:" + tsKey(prefix) + "*"
-	pubsub := s.client.PSubscribe(ctx, pattern)
-
 	ch := make(chan storage.WatchEvent, 100)
 
 	go func() {
 		defer close(ch)
-		defer pubsub.Close()
+
+		lastID := "$"
+		streamPattern := timeseriesKey(prefix)
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case msg, ok := <-pubsub.Channel():
-				if !ok {
-					return
-				}
+			default:
+			}
 
-				if msg.Payload != "ts.add" {
+			streams, err := s.client.XRead(ctx, &redis.XReadArgs{
+				Streams: []string{streamPattern, lastID},
+				Count:   100,
+				Block:   time.Second,
+			}).Result()
+
+			if err != nil {
+				if err == redis.Nil {
 					continue
 				}
-
-				// Extract key and get latest value
-				key := extractKeyFromChannel(msg.Channel, "ts:")
-				entry, err := s.Latest(ctx, key)
-				if err != nil {
-					continue
-				}
-
-				event := storage.WatchEvent{
-					Type:  storage.WatchEventAdd,
-					Entry: entry,
-				}
-
-				select {
-				case ch <- event:
-				case <-ctx.Done():
+				if ctx.Err() != nil {
 					return
+				}
+				continue
+			}
+
+			for _, stream := range streams {
+				key := strings.TrimPrefix(stream.Stream, "stream:")
+
+				for _, msg := range stream.Messages {
+					entry, err := parseStreamMessage(key, msg)
+					if err != nil {
+						continue
+					}
+
+					event := storage.WatchEvent{
+						Type:  storage.WatchEventAdd,
+						Entry: entry,
+					}
+
+					select {
+					case ch <- event:
+						lastID = msg.ID
+					case <-ctx.Done():
+						return
+					}
 				}
 			}
 		}
@@ -137,57 +138,28 @@ func (s *StreamStorage) Close() error {
 	return s.client.Close()
 }
 
-func tsKey(key string) string { return "ts:" + key }
+func timeseriesKey(key string) string { return "stream:" + key }
 
-func extractKeyFromChannel(channel, prefix string) string {
-	// Channel format: __keyspace@0__:ts:mykey
-	for i := 0; i < len(channel); i++ {
-		if channel[i] == ':' {
-			remaining := channel[i+1:]
-			if len(remaining) > len(prefix) && remaining[:len(prefix)] == prefix {
-				return remaining[len(prefix):]
-			}
-			return remaining
-		}
-	}
-	return channel
-}
-
-func parseTimeSeriesEntry(key string, result interface{}) (*storage.StreamEntry, error) {
-	// Result is [timestamp, value] array
-	arr, ok := result.([]interface{})
-	if !ok || len(arr) < 2 {
-		return nil, errors.New("invalid timeseries entry format")
+func parseStreamMessage(key string, msg redis.XMessage) (*storage.StreamEntry, error) {
+	data, ok := msg.Values["data"].(string)
+	if !ok {
+		return nil, errors.New("missing data field")
 	}
 
-	var tsMillis int64
-	switch v := arr[0].(type) {
-	case int64:
-		tsMillis = v
-	case string:
-		tsMillis, _ = strconv.ParseInt(v, 10, 64)
-	}
-
-	var value float64
-	switch v := arr[1].(type) {
-	case float64:
-		value = v
-	case string:
-		value, _ = strconv.ParseFloat(v, 64)
+	var ts time.Time
+	if tsNano, ok := msg.Values["ts"].(string); ok {
+		var nanos int64
+		fmt.Sscanf(tsNano, "%d", &nanos)
+		ts = time.Unix(0, nanos)
+	} else {
+		var millis int64
+		fmt.Sscanf(msg.ID, "%d", &millis)
+		ts = time.UnixMilli(millis)
 	}
 
 	return &storage.StreamEntry{
 		Key:       key,
-		Value:     value,
-		Timestamp: time.UnixMilli(tsMillis),
+		Value:     data,
+		Timestamp: ts,
 	}, nil
-}
-
-func isKeyNotFound(err error) bool {
-	return err != nil && (err.Error() == "ERR TSDB: the key does not exist" ||
-		errors.Is(err, redis.Nil))
-}
-
-func isKeyExists(err error) bool {
-	return err != nil && err.Error() == "ERR TSDB: key already exists"
 }

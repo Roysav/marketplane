@@ -54,9 +54,9 @@ func TestValidate_CoreTypes(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "valid RecordDefinition",
+			name: "valid MetaRecord",
 			record: &record.Record{
-				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "RecordDefinition"},
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "MetaRecord"},
 				Spec: map[string]any{
 					"group":   "test",
 					"version": "v1",
@@ -67,9 +67,9 @@ func TestValidate_CoreTypes(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid RecordDefinition - bad storage enum",
+			name: "invalid MetaRecord - bad storage enum",
 			record: &record.Record{
-				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "RecordDefinition"},
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "MetaRecord"},
 				Spec: map[string]any{
 					"group":   "test",
 					"version": "v1",
@@ -95,9 +95,9 @@ func TestValidate_CustomType(t *testing.T) {
 	v, s := newTestValidator(t)
 	ctx := context.Background()
 
-	// Create a RecordDefinition for a custom type
+	// Create a MetaRecord for a custom type
 	_, err := s.Create(ctx, &storage.Row{
-		Type:       "core/v1/RecordDefinition",
+		Type:       "core/v1/MetaRecord",
 		Tradespace: "default",
 		Name:       "Order.polymarket",
 		Data: `{
@@ -117,7 +117,7 @@ func TestValidate_CustomType(t *testing.T) {
 		}`,
 	})
 	if err != nil {
-		t.Fatalf("failed to create RecordDefinition: %v", err)
+		t.Fatalf("failed to create MetaRecord: %v", err)
 	}
 
 	tests := []struct {
@@ -192,7 +192,7 @@ func TestIsCoreType(t *testing.T) {
 	}{
 		{"core/v1/Tradespace", true},
 		{"core/v1/Quota", true},
-		{"core/v1/RecordDefinition", true},
+		{"core/v1/MetaRecord", true},
 		{"polymarket/v1/Order", false},
 	}
 

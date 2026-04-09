@@ -46,7 +46,7 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 ### Core Records (built-in)
 | Type | Description |
 |------|-------------|
-| `core/v1/RecordDefinition` | Defines custom record types |
+| `core/v1/MetaRecord` | Defines custom record types |
 | `core/v1/Tradespace` | Isolation boundary |
 | `core/v1/Quota` | Balance limits per Tradespace |
 
@@ -54,7 +54,7 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 - Isolation boundary for records (like K8s namespace)
 - Global records use `"default"` tradespace
 
-### RecordDefinition
+### MetaRecord
 Define custom types declaratively:
 ```json
 {
