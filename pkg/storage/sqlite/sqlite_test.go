@@ -22,7 +22,7 @@ func TestCreate(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "core/v1/Tradespace",
 		Tradespace: "default",
 		Name:       "production",
@@ -47,7 +47,7 @@ func TestCreate_Duplicate(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "core/v1/Tradespace",
 		Tradespace: "default",
 		Name:       "test",
@@ -67,7 +67,7 @@ func TestGet(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "test/v1/Foo",
 		Tradespace: "ns1",
 		Name:       "bar",
@@ -107,7 +107,7 @@ func TestUpdate(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "test/v1/Item",
 		Tradespace: "default",
 		Name:       "item1",
@@ -133,7 +133,7 @@ func TestUpdate_NotFound(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "test/v1/Item",
 		Tradespace: "default",
 		Name:       "nonexistent",
@@ -149,7 +149,7 @@ func TestDelete(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	r := &storage.Record{
+	r := &storage.Row{
 		Type:       "test/v1/Item",
 		Tradespace: "default",
 		Name:       "todelete",
@@ -186,7 +186,7 @@ func TestList(t *testing.T) {
 	ctx := context.Background()
 
 	for _, name := range []string{"a", "b", "c"} {
-		s.Create(ctx, &storage.Record{
+		s.Create(ctx, &storage.Row{
 			Type:       "test/v1/Item",
 			Tradespace: "default",
 			Name:       name,
@@ -214,8 +214,8 @@ func TestList_ByTradespace(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	s.Create(ctx, &storage.Record{Type: "test/v1/Item", Tradespace: "ns1", Name: "a"})
-	s.Create(ctx, &storage.Record{Type: "test/v1/Item", Tradespace: "ns2", Name: "b"})
+	s.Create(ctx, &storage.Row{Type: "test/v1/Item", Tradespace: "ns1", Name: "a"})
+	s.Create(ctx, &storage.Row{Type: "test/v1/Item", Tradespace: "ns2", Name: "b"})
 
 	records, err := s.List(ctx, storage.Query{Type: "test/v1/Item", Tradespace: "ns1"})
 	if err != nil {
@@ -233,13 +233,13 @@ func TestList_ByLabels(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	s.Create(ctx, &storage.Record{
+	s.Create(ctx, &storage.Row{
 		Type:       "test/v1/Item",
 		Tradespace: "default",
 		Name:       "a",
 		Labels:     map[string]string{"env": "prod"},
 	})
-	s.Create(ctx, &storage.Record{
+	s.Create(ctx, &storage.Row{
 		Type:       "test/v1/Item",
 		Tradespace: "default",
 		Name:       "b",

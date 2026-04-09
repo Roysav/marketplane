@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/roysav/marketplane/pkg/entity"
+	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
 	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
@@ -26,37 +26,37 @@ func TestValidate_CoreTypes(t *testing.T) {
 
 	tests := []struct {
 		name    string
-		entity  *entity.Entity
+		record  *record.Record
 		wantErr bool
 	}{
 		{
 			name: "valid Tradespace",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
 				Spec:     map[string]any{"description": "test"},
 			},
 			wantErr: false,
 		},
 		{
 			name: "valid Quota",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
 				Spec:     map[string]any{"balances": map[string]any{"USD": "1000"}},
 			},
 			wantErr: false,
 		},
 		{
 			name: "invalid Quota - missing balances",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
 				Spec:     map[string]any{},
 			},
 			wantErr: true,
 		},
 		{
-			name: "valid EntityDefinition",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "EntityDefinition"},
+			name: "valid RecordDefinition",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "RecordDefinition"},
 				Spec: map[string]any{
 					"group":   "test",
 					"version": "v1",
@@ -67,9 +67,9 @@ func TestValidate_CoreTypes(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "invalid EntityDefinition - bad storage enum",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "EntityDefinition"},
+			name: "invalid RecordDefinition - bad storage enum",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "RecordDefinition"},
 				Spec: map[string]any{
 					"group":   "test",
 					"version": "v1",
@@ -83,7 +83,7 @@ func TestValidate_CoreTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := v.Validate(ctx, tt.entity)
+			err := v.Validate(ctx, tt.record)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr = %v", err, tt.wantErr)
 			}
@@ -95,9 +95,9 @@ func TestValidate_CustomType(t *testing.T) {
 	v, s := newTestValidator(t)
 	ctx := context.Background()
 
-	// Create an EntityDefinition for a custom type
-	_, err := s.Create(ctx, &storage.Record{
-		Type:       "core/v1/EntityDefinition",
+	// Create a RecordDefinition for a custom type
+	_, err := s.Create(ctx, &storage.Row{
+		Type:       "core/v1/RecordDefinition",
 		Tradespace: "default",
 		Name:       "Order.polymarket",
 		Data: `{
@@ -117,18 +117,18 @@ func TestValidate_CustomType(t *testing.T) {
 		}`,
 	})
 	if err != nil {
-		t.Fatalf("failed to create EntityDefinition: %v", err)
+		t.Fatalf("failed to create RecordDefinition: %v", err)
 	}
 
 	tests := []struct {
 		name    string
-		entity  *entity.Entity
+		record  *record.Record
 		wantErr bool
 	}{
 		{
 			name: "valid Order",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
 				Spec: map[string]any{
 					"marketId": "abc123",
 					"side":     "YES",
@@ -139,8 +139,8 @@ func TestValidate_CustomType(t *testing.T) {
 		},
 		{
 			name: "invalid Order - missing required field",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
 				Spec: map[string]any{
 					"marketId": "abc123",
 				},
@@ -149,8 +149,8 @@ func TestValidate_CustomType(t *testing.T) {
 		},
 		{
 			name: "invalid Order - bad enum value",
-			entity: &entity.Entity{
-				TypeMeta: entity.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "polymarket", Version: "v1", Kind: "Order"},
 				Spec: map[string]any{
 					"marketId": "abc123",
 					"side":     "MAYBE",
@@ -162,7 +162,7 @@ func TestValidate_CustomType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := v.Validate(ctx, tt.entity)
+			err := v.Validate(ctx, tt.record)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Validate() error = %v, wantErr = %v", err, tt.wantErr)
 			}
@@ -174,12 +174,12 @@ func TestValidate_UnknownType(t *testing.T) {
 	v, _ := newTestValidator(t)
 	ctx := context.Background()
 
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "unknown", Version: "v1", Kind: "Thing"},
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "unknown", Version: "v1", Kind: "Thing"},
 		Spec:     map[string]any{},
 	}
 
-	err := v.Validate(ctx, e)
+	err := v.Validate(ctx, r)
 	if !errors.Is(err, ErrUnknownType) {
 		t.Errorf("expected ErrUnknownType, got: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestIsCoreType(t *testing.T) {
 	}{
 		{"core/v1/Tradespace", true},
 		{"core/v1/Quota", true},
-		{"core/v1/EntityDefinition", true},
+		{"core/v1/RecordDefinition", true},
 		{"polymarket/v1/Order", false},
 	}
 

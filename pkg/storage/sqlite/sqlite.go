@@ -1,4 +1,4 @@
-// Package sqlite provides a SQLite record storage implementation.
+// Package sqlite provides a SQLite row storage implementation.
 package sqlite
 
 import (
@@ -17,11 +17,11 @@ import (
 )
 
 var (
-	ErrNotFound      = errors.New("record not found")
-	ErrAlreadyExists = errors.New("record already exists")
+	ErrNotFound      = errors.New("row not found")
+	ErrAlreadyExists = errors.New("row already exists")
 )
 
-// Storage implements storage.RecordStorage using SQLite.
+// Storage implements storage.RowStorage using SQLite.
 type Storage struct {
 	db *sql.DB
 	mu sync.Mutex
@@ -53,7 +53,7 @@ func New(ctx context.Context, dsn string) (*Storage, error) {
 
 func (s *Storage) migrate(ctx context.Context) error {
 	schema := `
-	CREATE TABLE IF NOT EXISTS records (
+	CREATE TABLE IF NOT EXISTS rows (
 		type TEXT NOT NULL,
 		tradespace TEXT NOT NULL,
 		name TEXT NOT NULL,
@@ -65,14 +65,14 @@ func (s *Storage) migrate(ctx context.Context) error {
 		PRIMARY KEY (type, tradespace, name)
 	);
 
-	CREATE INDEX IF NOT EXISTS idx_records_type ON records(type);
-	CREATE INDEX IF NOT EXISTS idx_records_tradespace ON records(tradespace);
+	CREATE INDEX IF NOT EXISTS idx_rows_type ON rows(type);
+	CREATE INDEX IF NOT EXISTS idx_rows_tradespace ON rows(tradespace);
 	`
 	_, err := s.db.ExecContext(ctx, schema)
 	return err
 }
 
-func (s *Storage) Create(ctx context.Context, r *storage.Record) (*storage.Record, error) {
+func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -80,7 +80,7 @@ func (s *Storage) Create(ctx context.Context, r *storage.Record) (*storage.Recor
 	labelsJSON, _ := json.Marshal(r.Labels)
 
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO records (type, tradespace, name, labels, data, resource_version, created_at, updated_at)
+		INSERT INTO rows (type, tradespace, name, labels, data, resource_version, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, 1, ?, ?)
 	`, r.Type, r.Tradespace, r.Name, labelsJSON, r.Data, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
 
@@ -88,10 +88,10 @@ func (s *Storage) Create(ctx context.Context, r *storage.Record) (*storage.Recor
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			return nil, fmt.Errorf("%w: %s %s/%s", ErrAlreadyExists, r.Type, r.Tradespace, r.Name)
 		}
-		return nil, fmt.Errorf("failed to create record: %w", err)
+		return nil, fmt.Errorf("failed to create row: %w", err)
 	}
 
-	return &storage.Record{
+	return &storage.Row{
 		Type:            r.Type,
 		Tradespace:      r.Tradespace,
 		Name:            r.Name,
@@ -103,17 +103,17 @@ func (s *Storage) Create(ctx context.Context, r *storage.Record) (*storage.Recor
 	}, nil
 }
 
-func (s *Storage) Get(ctx context.Context, key storage.Key) (*storage.Record, error) {
+func (s *Storage) Get(ctx context.Context, key storage.Key) (*storage.Row, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
-		FROM records
+		FROM rows
 		WHERE type = ? AND tradespace = ? AND name = ?
 	`, key.Type, key.Tradespace, key.Name)
 
-	return scanRecord(row)
+	return scanRow(row)
 }
 
-func (s *Storage) Update(ctx context.Context, r *storage.Record) (*storage.Record, error) {
+func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -121,17 +121,17 @@ func (s *Storage) Update(ctx context.Context, r *storage.Record) (*storage.Recor
 	labelsJSON, _ := json.Marshal(r.Labels)
 
 	result, err := s.db.ExecContext(ctx, `
-		UPDATE records
+		UPDATE rows
 		SET labels = ?, data = ?, resource_version = resource_version + 1, updated_at = ?
 		WHERE type = ? AND tradespace = ? AND name = ?
 	`, labelsJSON, r.Data, now.Format(time.RFC3339Nano), r.Type, r.Tradespace, r.Name)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to update record: %w", err)
+		return nil, fmt.Errorf("failed to update row: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
 		return nil, ErrNotFound
 	}
 
@@ -143,26 +143,26 @@ func (s *Storage) Delete(ctx context.Context, key storage.Key) error {
 	defer s.mu.Unlock()
 
 	result, err := s.db.ExecContext(ctx, `
-		DELETE FROM records
+		DELETE FROM rows
 		WHERE type = ? AND tradespace = ? AND name = ?
 	`, key.Type, key.Tradespace, key.Name)
 
 	if err != nil {
-		return fmt.Errorf("failed to delete record: %w", err)
+		return fmt.Errorf("failed to delete row: %w", err)
 	}
 
-	rows, _ := result.RowsAffected()
-	if rows == 0 {
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
 		return ErrNotFound
 	}
 
 	return nil
 }
 
-func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Record, error) {
+func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Row, error) {
 	query := `
 		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
-		FROM records
+		FROM rows
 		WHERE type = ?
 	`
 	args := []any{q.Type}
@@ -183,29 +183,29 @@ func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Record,
 		query += fmt.Sprintf(" LIMIT %d", q.Limit)
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	dbRows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list records: %w", err)
+		return nil, fmt.Errorf("failed to list rows: %w", err)
 	}
-	defer rows.Close()
+	defer dbRows.Close()
 
-	var records []*storage.Record
-	for rows.Next() {
-		r, err := scanRecordRows(rows)
+	var result []*storage.Row
+	for dbRows.Next() {
+		r, err := scanRows(dbRows)
 		if err != nil {
 			return nil, err
 		}
-		records = append(records, r)
+		result = append(result, r)
 	}
 
-	return records, rows.Err()
+	return result, dbRows.Err()
 }
 
 func (s *Storage) Close() error {
 	return s.db.Close()
 }
 
-func scanRecord(row *sql.Row) (*storage.Record, error) {
+func scanRow(row *sql.Row) (*storage.Row, error) {
 	var (
 		typ             string
 		tradespace      string
@@ -222,13 +222,13 @@ func scanRecord(row *sql.Row) (*storage.Record, error) {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, fmt.Errorf("failed to scan record: %w", err)
+		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
 
-	return buildRecord(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
+	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
 }
 
-func scanRecordRows(rows *sql.Rows) (*storage.Record, error) {
+func scanRows(rows *sql.Rows) (*storage.Row, error) {
 	var (
 		typ             string
 		tradespace      string
@@ -242,13 +242,13 @@ func scanRecordRows(rows *sql.Rows) (*storage.Record, error) {
 
 	err := rows.Scan(&typ, &tradespace, &name, &labelsJSON, &data, &resourceVersion, &createdAt, &updatedAt)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan record: %w", err)
+		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
 
-	return buildRecord(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
+	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
 }
 
-func buildRecord(typ, tradespace, name string, labelsJSON, data sql.NullString, resourceVersion int64, createdAt, updatedAt string) (*storage.Record, error) {
+func buildRow(typ, tradespace, name string, labelsJSON, data sql.NullString, resourceVersion int64, createdAt, updatedAt string) (*storage.Row, error) {
 	var labels map[string]string
 	if labelsJSON.Valid {
 		json.Unmarshal([]byte(labelsJSON.String), &labels)
@@ -262,7 +262,7 @@ func buildRecord(typ, tradespace, name string, labelsJSON, data sql.NullString, 
 		dataStr = data.String
 	}
 
-	return &storage.Record{
+	return &storage.Row{
 		Type:            typ,
 		Tradespace:      tradespace,
 		Name:            name,

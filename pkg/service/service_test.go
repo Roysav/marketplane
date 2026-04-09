@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/roysav/marketplane/pkg/entity"
+	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
 
@@ -15,19 +15,19 @@ func newTestService(t *testing.T) *Service {
 	t.Helper()
 	ctx := context.Background()
 
-	records, err := sqlite.New(ctx, ":memory:")
+	rows, err := sqlite.New(ctx, ":memory:")
 	if err != nil {
 		t.Fatalf("failed to create storage: %v", err)
 	}
-	t.Cleanup(func() { records.Close() })
+	t.Cleanup(func() { rows.Close() })
 
 	// Use a discarding logger for tests
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	return New(Config{
-		Records: records,
-		Events:  nil, // no events for basic tests
-		Logger:  log,
+		Rows:   rows,
+		Events: nil, // no events for basic tests
+		Logger: logger,
 	})
 }
 
@@ -35,9 +35,9 @@ func TestService_CreateAndGet(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
-		ObjectMeta: entity.ObjectMeta{
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "test-tradespace",
 			Labels:     map[string]string{"env": "test"},
@@ -46,7 +46,7 @@ func TestService_CreateAndGet(t *testing.T) {
 	}
 
 	// Create
-	created, err := svc.Create(ctx, e)
+	created, err := svc.Create(ctx, r)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -73,21 +73,21 @@ func TestService_CreateDuplicate(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
-		ObjectMeta: entity.ObjectMeta{
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "dup-test",
 		},
 		Spec: map[string]any{},
 	}
 
-	_, err := svc.Create(ctx, e)
+	_, err := svc.Create(ctx, r)
 	if err != nil {
 		t.Fatalf("first Create failed: %v", err)
 	}
 
-	_, err = svc.Create(ctx, e)
+	_, err = svc.Create(ctx, r)
 	if !errors.Is(err, ErrAlreadyExists) {
 		t.Errorf("expected ErrAlreadyExists, got: %v", err)
 	}
@@ -97,16 +97,16 @@ func TestService_Update(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
-		ObjectMeta: entity.ObjectMeta{
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "update-test",
 		},
 		Spec: map[string]any{"description": "original"},
 	}
 
-	created, err := svc.Create(ctx, e)
+	created, err := svc.Create(ctx, r)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -133,16 +133,16 @@ func TestService_Delete(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
-		ObjectMeta: entity.ObjectMeta{
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "delete-test",
 		},
 		Spec: map[string]any{},
 	}
 
-	_, err := svc.Create(ctx, e)
+	_, err := svc.Create(ctx, r)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
@@ -162,30 +162,30 @@ func TestService_List(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Create multiple entities
+	// Create multiple records
 	for _, name := range []string{"ts-1", "ts-2", "ts-3"} {
-		e := &entity.Entity{
-			TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
-			ObjectMeta: entity.ObjectMeta{
+		r := &record.Record{
+			TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+			ObjectMeta: record.ObjectMeta{
 				Tradespace: "default",
 				Name:       name,
 			},
 			Spec: map[string]any{},
 		}
-		_, err := svc.Create(ctx, e)
+		_, err := svc.Create(ctx, r)
 		if err != nil {
 			t.Fatalf("Create %s failed: %v", name, err)
 		}
 	}
 
 	// List all
-	entities, err := svc.List(ctx, "core/v1/Tradespace", "", nil)
+	records, err := svc.List(ctx, "core/v1/Tradespace", "", nil)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
-	if len(entities) != 3 {
-		t.Errorf("expected 3 entities, got %d", len(entities))
+	if len(records) != 3 {
+		t.Errorf("expected 3 records, got %d", len(records))
 	}
 }
 
@@ -193,30 +193,30 @@ func TestService_ListByTradespace(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Create entities in different tradespaces
+	// Create records in different tradespaces
 	for _, ts := range []string{"prod", "staging", "prod"} {
-		e := &entity.Entity{
-			TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
-			ObjectMeta: entity.ObjectMeta{
+		r := &record.Record{
+			TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+			ObjectMeta: record.ObjectMeta{
 				Tradespace: ts,
 				Name:       "quota-" + ts + "-" + randomSuffix(),
 			},
 			Spec: map[string]any{"balances": map[string]any{"USD": "100"}},
 		}
-		_, err := svc.Create(ctx, e)
+		_, err := svc.Create(ctx, r)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
 		}
 	}
 
 	// List only prod
-	entities, err := svc.List(ctx, "core/v1/Quota", "prod", nil)
+	records, err := svc.List(ctx, "core/v1/Quota", "prod", nil)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
-	if len(entities) != 2 {
-		t.Errorf("expected 2 entities in prod, got %d", len(entities))
+	if len(records) != 2 {
+		t.Errorf("expected 2 records in prod, got %d", len(records))
 	}
 }
 
@@ -225,16 +225,16 @@ func TestService_ValidationError(t *testing.T) {
 	ctx := context.Background()
 
 	// Missing required field for Quota
-	e := &entity.Entity{
-		TypeMeta: entity.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
-		ObjectMeta: entity.ObjectMeta{
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "invalid-quota",
 		},
 		Spec: map[string]any{}, // missing "balances"
 	}
 
-	_, err := svc.Create(ctx, e)
+	_, err := svc.Create(ctx, r)
 	if !errors.Is(err, ErrValidation) {
 		t.Errorf("expected ErrValidation, got: %v", err)
 	}

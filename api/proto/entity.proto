@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package marketplane.v1;
+
+option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// EntityService provides CRUD operations for entities.
+service EntityService {
+  // Create creates a new entity.
+  rpc Create(CreateRequest) returns (CreateResponse);
+
+  // Get retrieves an entity by key.
+  rpc Get(GetRequest) returns (GetResponse);
+
+  // Update updates an existing entity.
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+
+  // Delete removes an entity.
+  rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+  // List returns entities matching the query.
+  rpc List(ListRequest) returns (ListResponse);
+
+  // Watch streams entity change events.
+  rpc Watch(WatchRequest) returns (stream WatchEvent);
+}
+
+// TypeMeta describes the type of an entity.
+message TypeMeta {
+  string group = 1;
+  string version = 2;
+  string kind = 3;
+}
+
+// ObjectMeta contains metadata about an entity.
+message ObjectMeta {
+  string name = 1;
+  string tradespace = 2;
+  map<string, string> labels = 3;
+  map<string, string> annotations = 4;
+  int64 resource_version = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+// Entity is the generic wrapper for all resources.
+message Entity {
+  TypeMeta type_meta = 1;
+  ObjectMeta object_meta = 2;
+  google.protobuf.Struct spec = 3;
+  google.protobuf.Struct status = 4;
+}
+
+// CreateRequest is the request for Create.
+message CreateRequest {
+  Entity entity = 1;
+}
+
+// CreateResponse is the response for Create.
+message CreateResponse {
+  Entity entity = 1;
+}
+
+// GetRequest is the request for Get.
+message GetRequest {
+  string type = 1;       // e.g., "core/v1/Tradespace"
+  string tradespace = 2;
+  string name = 3;
+}
+
+// GetResponse is the response for Get.
+message GetResponse {
+  Entity entity = 1;
+}
+
+// UpdateRequest is the request for Update.
+message UpdateRequest {
+  Entity entity = 1;
+}
+
+// UpdateResponse is the response for Update.
+message UpdateResponse {
+  Entity entity = 1;
+}
+
+// DeleteRequest is the request for Delete.
+message DeleteRequest {
+  string type = 1;
+  string tradespace = 2;
+  string name = 3;
+}
+
+// DeleteResponse is the response for Delete.
+message DeleteResponse {}
+
+// ListRequest is the request for List.
+message ListRequest {
+  string type = 1;
+  string tradespace = 2;           // optional filter
+  map<string, string> labels = 3;  // optional filter
+}
+
+// ListResponse is the response for List.
+message ListResponse {
+  repeated Entity entities = 1;
+}
+
+// WatchRequest is the request for Watch.
+message WatchRequest {
+  string type = 1;  // entity type to watch
+}
+
+// WatchEvent is a change event streamed by Watch.
+message WatchEvent {
+  string action = 1;  // "created", "updated", "deleted"
+  Entity entity = 2;
+}

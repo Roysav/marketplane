@@ -1,4 +1,4 @@
-// Package validator validates entities against their schemas.
+// Package validator validates records against their schemas.
 package validator
 
 import (
@@ -10,18 +10,18 @@ import (
 
 	"github.com/xeipuuv/gojsonschema"
 
-	"github.com/roysav/marketplane/pkg/entity"
+	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
 )
 
 var (
-	ErrUnknownType = errors.New("unknown entity type")
+	ErrUnknownType = errors.New("unknown record type")
 	ErrValidation  = errors.New("validation failed")
 )
 
 // coreSchemas holds JSON Schema definitions for built-in types.
 var coreSchemas = map[string]map[string]any{
-	"core/v1/EntityDefinition": {
+	"core/v1/RecordDefinition": {
 		"type":     "object",
 		"required": []any{"group", "version", "kind", "storage"},
 		"properties": map[string]any{
@@ -65,39 +65,39 @@ func init() {
 	}
 }
 
-// Validator validates entities against their schemas.
+// Validator validates records against their schemas.
 type Validator struct {
-	storage storage.RecordStorage
+	storage storage.RowStorage
 }
 
 // New creates a new Validator.
-func New(s storage.RecordStorage) *Validator {
+func New(s storage.RowStorage) *Validator {
 	return &Validator{storage: s}
 }
 
-// Validate checks an entity's spec against its schema.
-func (v *Validator) Validate(ctx context.Context, e *entity.Entity) error {
-	typeStr := e.TypeMeta.GVK().Type()
+// Validate checks a record's spec against its schema.
+func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
+	typeStr := r.TypeMeta.GVK().Type()
 
 	// Check core types first
 	if schema, ok := compiledCoreSchemas[typeStr]; ok {
-		return validateWithSchema(schema, e.Spec)
+		return validateWithSchema(schema, r.Spec)
 	}
 
-	// Look up EntityDefinition from storage
-	record, err := v.storage.Get(ctx, storage.Key{
-		Type:       "core/v1/EntityDefinition",
+	// Look up RecordDefinition from storage
+	row, err := v.storage.Get(ctx, storage.Key{
+		Type:       "core/v1/RecordDefinition",
 		Tradespace: "default",
-		Name:       definitionName(e.TypeMeta.GVK()),
+		Name:       definitionName(r.TypeMeta.GVK()),
 	})
 	if err != nil {
 		return fmt.Errorf("%w: %s", ErrUnknownType, typeStr)
 	}
 
-	// Parse the EntityDefinition data
+	// Parse the RecordDefinition data
 	var data map[string]any
-	if err := json.Unmarshal([]byte(record.Data), &data); err != nil {
-		return fmt.Errorf("invalid EntityDefinition data: %w", err)
+	if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
+		return fmt.Errorf("invalid RecordDefinition data: %w", err)
 	}
 
 	schemaData, ok := data["schema"].(map[string]any)
@@ -110,7 +110,7 @@ func (v *Validator) Validate(ctx context.Context, e *entity.Entity) error {
 		return fmt.Errorf("invalid schema for %s: %w", typeStr, err)
 	}
 
-	return validateWithSchema(schema, e.Spec)
+	return validateWithSchema(schema, r.Spec)
 }
 
 // IsCoreType returns true if the type string is a built-in core type.
@@ -119,8 +119,8 @@ func IsCoreType(typeStr string) bool {
 	return ok
 }
 
-// definitionName returns the EntityDefinition name for a GVK.
-func definitionName(gvk entity.GroupVersionKind) string {
+// definitionName returns the RecordDefinition name for a GVK.
+func definitionName(gvk record.GroupVersionKind) string {
 	return fmt.Sprintf("%s.%s", gvk.Kind, gvk.Group)
 }
 

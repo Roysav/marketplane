@@ -1,4 +1,4 @@
-// Package storage defines the record storage interface.
+// Package storage defines the storage interfaces.
 package storage
 
 import (
@@ -12,15 +12,15 @@ var (
 	ErrAlreadyExists = errors.New("already exists")
 )
 
-// Key uniquely identifies a record.
+// Key uniquely identifies a row.
 type Key struct {
 	Type       string // e.g. "core/v1/Tradespace"
 	Tradespace string
 	Name       string
 }
 
-// Record is a stored entity.
-type Record struct {
+// Row is a stored record in the database.
+type Row struct {
 	Type       string // e.g. "core/v1/Tradespace"
 	Tradespace string
 	Name       string
@@ -32,8 +32,8 @@ type Record struct {
 	UpdatedAt       time.Time
 }
 
-// Key returns the record's key.
-func (r *Record) Key() Key {
+// Key returns the row's key.
+func (r *Row) Key() Key {
 	return Key{
 		Type:       r.Type,
 		Tradespace: r.Tradespace,
@@ -43,18 +43,18 @@ func (r *Record) Key() Key {
 
 // Query specifies filtering for List.
 type Query struct {
-	Type       string // required, e.g. "core/v1/Tradespace"
-	Tradespace string // optional
+	Type       string            // required, e.g. "core/v1/Tradespace"
+	Tradespace string            // optional
 	Labels     map[string]string // optional
 	Limit      int
 }
 
-// RecordStorage persists records.
-type RecordStorage interface {
-	Create(ctx context.Context, r *Record) (*Record, error)
-	Get(ctx context.Context, key Key) (*Record, error)
-	Update(ctx context.Context, r *Record) (*Record, error)
+// RowStorage persists rows.
+type RowStorage interface {
+	Create(ctx context.Context, r *Row) (*Row, error)
+	Get(ctx context.Context, key Key) (*Row, error)
+	Update(ctx context.Context, r *Row) (*Row, error)
 	Delete(ctx context.Context, key Key) error
-	List(ctx context.Context, q Query) ([]*Record, error)
+	List(ctx context.Context, q Query) ([]*Row, error)
 	Close() error
 }
