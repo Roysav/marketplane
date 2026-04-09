@@ -228,7 +228,7 @@ func TestService_ValidationError(t *testing.T) {
 	r := &record.Record{
 		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
 		ObjectMeta: record.ObjectMeta{
-			Tradespace: "default",
+			Tradespace: "myns",
 			Name:       "invalid-quota",
 		},
 		Spec: map[string]any{}, // missing "balances"

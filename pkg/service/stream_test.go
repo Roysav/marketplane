@@ -63,10 +63,7 @@ func createTestStreamDefinition(t *testing.T, s *StreamService, name string) Str
 	}
 
 	return StreamKey{
-		Group:   "Binance.MarketFeed",
-		Version: "v1alpha1",
-		Kind:    "Quotes",
-		Name:    name,
+		Name: name,
 	}
 }
 
@@ -196,10 +193,7 @@ func TestStreamService_NotFound(t *testing.T) {
 	s, _ := newTestStreamService(t)
 
 	key := StreamKey{
-		Group:   "nonexistent",
-		Version: "v1",
-		Kind:    "Test",
-		Name:    "missing",
+		Name: "missing",
 	}
 
 	_, err := s.Latest(ctx, key)
@@ -220,10 +214,7 @@ func TestStreamService_KeyMismatch(t *testing.T) {
 
 	// Try to access with wrong group/version/kind
 	key := StreamKey{
-		Group:   "WrongGroup",
-		Version: "v1alpha1",
-		Kind:    "Quotes",
-		Name:    "linkusdt",
+		Name: "linkusdt",
 	}
 
 	_, err := s.Latest(ctx, key)

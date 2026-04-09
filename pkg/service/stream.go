@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -97,7 +98,14 @@ func (s *StreamService) Latest(ctx context.Context, key StreamKey) (*storage.Str
 	streamKey := key.String()
 	s.logger.Debug("getting latest from stream", "key", streamKey)
 
-	return s.streams.Latest(ctx, streamKey)
+	entry, err := s.streams.Latest(ctx, streamKey)
+	if err != nil {
+		if isStreamNotFound(err) {
+			return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
+		}
+		return nil, err
+	}
+	return entry, nil
 }
 
 // Range gets entries within a time range.
@@ -169,4 +177,13 @@ func (s *StreamService) validateData(schemaData map[string]any, data map[string]
 	}
 
 	return nil
+}
+
+// isStreamNotFound checks if the error indicates a stream key was not found.
+func isStreamNotFound(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, storage.ErrNotFound) ||
+		strings.Contains(err.Error(), "not found")
 }
