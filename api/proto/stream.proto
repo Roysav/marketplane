@@ -24,9 +24,6 @@ service StreamService {
 
 // StreamKey uniquely identifies a stream. All fields are required.
 message StreamKey {
-  string group = 1;    // e.g., "Binance.MarketFeed"
-  string version = 2;  // e.g., "v1alpha1"
-  string kind = 3;     // e.g., "Quotes"
   string name = 4;     // e.g., "btcusdt"
 }
 

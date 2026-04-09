@@ -14,9 +14,18 @@ import (
 	"github.com/roysav/marketplane/pkg/storage"
 )
 
+// Scope defines where a record type can be created.
+type Scope string
+
+const (
+	ScopeTradespace Scope = "tradespace" // Must have a specific tradespace
+	ScopeGlobal     Scope = "global"     // Must use "default" tradespace
+)
+
 var (
-	ErrUnknownType = errors.New("unknown record type")
-	ErrValidation  = errors.New("validation failed")
+	ErrUnknownType  = errors.New("unknown record type")
+	ErrValidation   = errors.New("validation failed")
+	ErrInvalidScope = errors.New("invalid scope")
 )
 
 // coreSchemas holds JSON Schema definitions for built-in types.
@@ -39,6 +48,7 @@ var coreSchemas = map[string]map[string]any{
 			"group":     map[string]any{"type": "string"},
 			"version":   map[string]any{"type": "string"},
 			"kind":      map[string]any{"type": "string"},
+			"scope":     map[string]any{"type": "string", "enum": []any{"tradespace", "global"}},
 			"schema":    map[string]any{"type": "object"},
 			"retention": map[string]any{"type": "string"},
 		},
@@ -59,6 +69,14 @@ var coreSchemas = map[string]map[string]any{
 			},
 		},
 	},
+}
+
+// coreScopes defines the scope for built-in types.
+var coreScopes = map[string]Scope{
+	"core/v1/MetaRecord":       ScopeGlobal,     // Type definitions are global
+	"core/v1/StreamDefinition": ScopeGlobal,     // Stream definitions are global
+	"core/v1/Tradespace":       ScopeGlobal,     // Tradespaces themselves are global
+	"core/v1/Quota":            ScopeTradespace, // Quotas are per-tradespace
 }
 
 // compiledCoreSchemas holds pre-compiled schemas for core types.
@@ -123,6 +141,64 @@ func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
 	return validateWithSchema(schema, r.Spec)
 }
 
+// ValidateScope checks that the record's tradespace matches its type's scope.
+func (v *Validator) ValidateScope(ctx context.Context, r *record.Record) error {
+	typeStr := r.TypeMeta.GVK().Type()
+	tradespace := r.ObjectMeta.Tradespace
+
+	scope, err := v.GetScope(ctx, typeStr)
+	if err != nil {
+		return err
+	}
+
+	switch scope {
+	case ScopeGlobal:
+		if tradespace != "" && tradespace != "default" {
+			return fmt.Errorf("%w: type %s is global, tradespace must be 'default' or empty, got '%s'",
+				ErrInvalidScope, typeStr, tradespace)
+		}
+	case ScopeTradespace:
+		if tradespace == "" || tradespace == "default" {
+			return fmt.Errorf("%w: type %s is tradespace-scoped, tradespace is required",
+				ErrInvalidScope, typeStr)
+		}
+	}
+
+	return nil
+}
+
+// GetScope returns the scope for a record type.
+func (v *Validator) GetScope(ctx context.Context, typeStr string) (Scope, error) {
+	// Check core types first
+	if scope, ok := coreScopes[typeStr]; ok {
+		return scope, nil
+	}
+
+	// Look up MetaRecord from storage
+	row, err := v.storage.Get(ctx, storage.Key{
+		Type:       "core/v1/MetaRecord",
+		Tradespace: "default",
+		Name:       definitionNameFromType(typeStr),
+	})
+	if err != nil {
+		return "", fmt.Errorf("%w: %s", ErrUnknownType, typeStr)
+	}
+
+	// Parse the MetaRecord data
+	var data map[string]any
+	if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
+		return "", fmt.Errorf("invalid MetaRecord data: %w", err)
+	}
+
+	// Default to tradespace scope if not specified
+	scopeStr, _ := data["scope"].(string)
+	if scopeStr == "" {
+		return ScopeTradespace, nil
+	}
+
+	return Scope(scopeStr), nil
+}
+
 // IsCoreType returns true if the type string is a built-in core type.
 func IsCoreType(typeStr string) bool {
 	_, ok := coreSchemas[typeStr]
@@ -132,6 +208,15 @@ func IsCoreType(typeStr string) bool {
 // definitionName returns the MetaRecord name for a GVK.
 func definitionName(gvk record.GroupVersionKind) string {
 	return fmt.Sprintf("%s.%s", gvk.Kind, gvk.Group)
+}
+
+// definitionNameFromType returns the MetaRecord name from a type string.
+func definitionNameFromType(typeStr string) string {
+	parts := strings.Split(typeStr, "/")
+	if len(parts) != 3 {
+		return typeStr
+	}
+	return fmt.Sprintf("%s.%s", parts[2], parts[0]) // Kind.Group
 }
 
 func validateWithSchema(schema *gojsonschema.Schema, spec map[string]any) error {

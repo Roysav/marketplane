@@ -20,22 +20,16 @@ var (
 
 // StreamKey uniquely identifies a stream.
 type StreamKey struct {
-	Group   string
-	Version string
-	Kind    string
-	Name    string
+	Name string
 }
 
 // String returns the full key as group/version/kind/name.
 func (k StreamKey) String() string {
-	return fmt.Sprintf("%s/%s/%s/%s", k.Group, k.Version, k.Kind, k.Name)
+	return fmt.Sprintf("%s", k.Name)
 }
 
 // StreamDefinitionSpec represents the spec of a StreamDefinition record.
 type StreamDefinitionSpec struct {
-	Group     string         `json:"group"`
-	Version   string         `json:"version"`
-	Kind      string         `json:"kind"`
 	Schema    map[string]any `json:"schema,omitempty"`
 	Retention string         `json:"retention,omitempty"`
 }
@@ -149,14 +143,6 @@ func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*Stre
 	var spec StreamDefinitionSpec
 	if err := json.Unmarshal([]byte(row.Data), &spec); err != nil {
 		return nil, fmt.Errorf("invalid stream definition data: %w", err)
-	}
-
-	// Verify the spec matches the requested key
-	if spec.Group != key.Group || spec.Version != key.Version || spec.Kind != key.Kind {
-		s.logger.Warn("stream definition mismatch",
-			"requested", key.String(),
-			"found", fmt.Sprintf("%s/%s/%s", spec.Group, spec.Version, spec.Kind))
-		return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
 	}
 
 	return &spec, nil

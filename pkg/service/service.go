@@ -18,6 +18,7 @@ var (
 	ErrNotFound      = errors.New("record not found")
 	ErrAlreadyExists = errors.New("record already exists")
 	ErrValidation    = errors.New("validation failed")
+	ErrInvalidScope  = errors.New("invalid scope")
 )
 
 // Config holds configuration for the Service.
@@ -52,7 +53,12 @@ func New(cfg Config) *Service {
 
 // Create creates a new record.
 func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
-	// Validate the record
+	// Validate scope (tradespace vs global)
+	if err := s.validator.ValidateScope(ctx, r); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidScope, err)
+	}
+
+	// Validate the record spec against schema
 	if err := s.validator.Validate(ctx, r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
@@ -230,10 +236,13 @@ func recordToRow(r *record.Record) (*storage.Row, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal record data: %w", err)
 	}
-
+	tradespace := r.ObjectMeta.Tradespace
+	if tradespace == "" {
+		tradespace = "default"
+	}
 	return &storage.Row{
 		Type:            r.TypeMeta.GVK().Type(),
-		Tradespace:      r.ObjectMeta.Tradespace,
+		Tradespace:      tradespace,
 		Name:            r.ObjectMeta.Name,
 		Labels:          r.ObjectMeta.Labels,
 		Data:            string(data),

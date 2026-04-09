@@ -147,32 +147,17 @@ func validateStreamKey(k *pb.StreamKey) (service.StreamKey, error) {
 	if k == nil {
 		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key is required")
 	}
-	if k.Group == "" {
-		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key.group is required")
-	}
-	if k.Version == "" {
-		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key.version is required")
-	}
-	if k.Kind == "" {
-		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key.kind is required")
-	}
 	if k.Name == "" {
 		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key.name is required")
 	}
 	return service.StreamKey{
-		Group:   k.Group,
-		Version: k.Version,
-		Kind:    k.Kind,
-		Name:    k.Name,
+		Name: k.Name,
 	}, nil
 }
 
 func pbStreamKey(k service.StreamKey) *pb.StreamKey {
 	return &pb.StreamKey{
-		Group:   k.Group,
-		Version: k.Version,
-		Kind:    k.Kind,
-		Name:    k.Name,
+		Name: k.Name,
 	}
 }
 

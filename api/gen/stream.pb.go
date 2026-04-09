@@ -26,10 +26,7 @@ const (
 // StreamKey uniquely identifies a stream. All fields are required.
 type StreamKey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Group         string                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`     // e.g., "Binance.MarketFeed"
-	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // e.g., "v1alpha1"
-	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`       // e.g., "Quotes"
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`       // e.g., "btcusdt"
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"` // e.g., "btcusdt"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -62,27 +59,6 @@ func (x *StreamKey) ProtoReflect() protoreflect.Message {
 // Deprecated: Use StreamKey.ProtoReflect.Descriptor instead.
 func (*StreamKey) Descriptor() ([]byte, []int) {
 	return file_stream_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *StreamKey) GetGroup() string {
-	if x != nil {
-		return x.Group
-	}
-	return ""
-}
-
-func (x *StreamKey) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
-}
-
-func (x *StreamKey) GetKind() string {
-	if x != nil {
-		return x.Kind
-	}
-	return ""
 }
 
 func (x *StreamKey) GetName() string {
@@ -496,11 +472,8 @@ var File_stream_proto protoreflect.FileDescriptor
 
 const file_stream_proto_rawDesc = "" +
 	"\n" +
-	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"c\n" +
-	"\tStreamKey\x12\x14\n" +
-	"\x05group\x18\x01 \x01(\tR\x05group\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x12\n" +
+	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x1f\n" +
+	"\tStreamKey\x12\x12\n" +
 	"\x04name\x18\x04 \x01(\tR\x04name\"\xa3\x01\n" +
 	"\rAppendRequest\x12+\n" +
 	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\x128\n" +
