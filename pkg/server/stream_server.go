@@ -108,7 +108,7 @@ func (s *StreamServer) Range(ctx context.Context, req *pb.RangeRequest) (*pb.Ran
 
 // Watch streams new entries as they arrive.
 func (s *StreamServer) Watch(req *pb.StreamWatchRequest, stream grpc.ServerStreamingServer[pb.StreamEntry]) error {
-	if req.Name == "" && req.Group == "" && req.Kind == "" {
+	if req.Name == "" || req.Group == "" || req.Kind == "" {
 		return status.Error(codes.InvalidArgument, "at least one of name, group, or kind is required")
 	}
 
