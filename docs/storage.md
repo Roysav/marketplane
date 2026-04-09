@@ -1,27 +1,27 @@
-**Two storage types:**
-- **Record** - a persistent record, atomic operations, use cases: storing transaction data.
-- **Stream** (Redis) - real-time, more fragile - no atomicity premises, use cases: continuous ticker quota for assets, events(?perhaps should be an optionally different storage, but ok for now)
+**Storage types:**
+- **Row** - persistent database row, atomic operations, use cases: storing transaction data.
+- **Stream** (Redis TimeSeries) - real-time timeseries data, no atomicity premises
+- **Event** (Redis Streams) - message queue for change events
 
-# Record Storage
-Should be atomic stable storage for important things, like transactions, allocations, quotas etc...
-a records storage implementation is kept de-coupled from business logic as much as possible, but leakage from business logic to implementation is inevitable.
-From the scope of a record-storage backend a record look like:
+# Row Storage
+Atomic stable storage for important things like transactions, allocations, quotas etc.
+Row storage is decoupled from business logic - it doesn't know about Spec/Status.
 
 from `./pkg/storage/storage.go`
 ```go
-type Record struct {
+type Row struct {
 	Type       string // e.g. "core/v1/Tradespace"
 	Tradespace string
 	Name       string
 	Labels     map[string]string
-	Data       string // JSON blob
+	Data       string // JSON blob (contains spec/status)
 
 	ResourceVersion int64
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
 ```
-Clear limitations on the ability to filter records in a more complex manner, as there is now way for the caller to filter json fields. this is by design.
+Filtering is limited to Type, Tradespace, and Labels. No JSON field filtering - by design.
 
 # Stream (Timeseries)
 
@@ -67,7 +67,7 @@ type EventStorage interface {
 }
 ```
 
-**Use cases:** Entity change notifications, order events, system events.
+**Use cases:** Record change notifications, order events, system events.
 
 # Infrastructure
 

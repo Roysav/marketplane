@@ -17,32 +17,44 @@ Module: `github.com/roysav/marketplane`
                     ▼                                 ▼
               ┌──────────┐                     ┌──────────┐
               │ Postgres │                     │  Redis   │
-              │ (Record) │                     │ (Stream) │
+              │  (Row)   │                     │ (Stream) │
               └──────────┘                     └──────────┘
 ```
 
-**Two storage types:**
-- **Record** (PostgreSQL/SQLite) - persistent entities
-- **Stream** (Redis TimeSeries) - real-time timeseries data, watches
-- **Event** (Redis Streams) - message queue for events
+**Storage types:**
+- **Row** (PostgreSQL/SQLite) - persistent storage for records
+- **Stream** (Redis TimeSeries) - real-time timeseries data
+- **Event** (Redis Streams) - message queue for change events
 
 ## Key Concepts
 
-### Entity Identification
+### Record
+A Record is the core resource type - like an order record, tradespace record, etc.
+
+```go
+type Record struct {
+    TypeMeta   // group/version/kind
+    ObjectMeta // name, tradespace, labels, resourceVersion
+    Spec       map[string]any  // desired state
+    Status     map[string]any  // current state
+}
+```
+
+### Record Identification
 Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 
-### Core Entities (built-in)
+### Core Records (built-in)
 | Type | Description |
 |------|-------------|
-| `core/v1/EntityDefinition` | Defines custom entity types |
+| `core/v1/RecordDefinition` | Defines custom record types |
 | `core/v1/Tradespace` | Isolation boundary |
 | `core/v1/Quota` | Balance limits per Tradespace |
 
 ### Tradespace
-- Isolation boundary for entities (like K8s namespace)
-- Global entities use `"default"` tradespace
+- Isolation boundary for records (like K8s namespace)
+- Global records use `"default"` tradespace
 
-### EntityDefinition
+### RecordDefinition
 Define custom types declaratively:
 ```json
 {
@@ -57,19 +69,22 @@ Define custom types declaratively:
 ## Current Implementation
 
 ```
+api/
+└── proto/
+    └── record.proto       # gRPC service definition
 pkg/
-├── entity/
-│   ├── types.go           # Entity, TypeMeta, ObjectMeta, GroupVersionKind
+├── record/
+│   ├── types.go           # Record, TypeMeta, ObjectMeta, GroupVersionKind
 │   └── types_test.go
 ├── service/
 │   ├── service.go         # Business logic layer (CRUD, validation, events)
 │   └── service_test.go
 ├── storage/
-│   ├── storage.go         # RecordStorage interface
+│   ├── storage.go         # RowStorage interface (Row type)
 │   ├── stream.go          # StreamStorage interface (timeseries)
 │   ├── event.go           # EventStorage interface (message queue)
 │   ├── sqlite/
-│   │   ├── sqlite.go      # SQLite RecordStorage implementation
+│   │   ├── sqlite.go      # SQLite RowStorage implementation
 │   │   └── sqlite_test.go
 │   └── redis/
 │       ├── redis.go       # Redis client setup
@@ -82,7 +97,7 @@ pkg/
     └── validator_test.go
 ```
 
-### RecordStorage Interface
+### RowStorage Interface
 ```go
 type Key struct {
     Type       string  // "core/v1/Tradespace"
@@ -90,7 +105,7 @@ type Key struct {
     Name       string
 }
 
-type Record struct {
+type Row struct {
     Type, Tradespace, Name string
     Labels                 map[string]string
     Data                   string  // JSON blob
@@ -98,26 +113,26 @@ type Record struct {
     CreatedAt, UpdatedAt   time.Time
 }
 
-type RecordStorage interface {
-    Create(ctx, *Record) (*Record, error)
-    Get(ctx, Key) (*Record, error)
-    Update(ctx, *Record) (*Record, error)
+type RowStorage interface {
+    Create(ctx, *Row) (*Row, error)
+    Get(ctx, Key) (*Row, error)
+    Update(ctx, *Row) (*Row, error)
     Delete(ctx, Key) error
-    List(ctx, Query) ([]*Record, error)
+    List(ctx, Query) ([]*Row, error)
     Close() error
 }
 ```
 
 ### Design Decisions
-1. **Storage is generic** - doesn't know about Entity/Spec/Status
-2. **No caching** - always hit database, for now. 
+1. **Storage is generic** - doesn't know about Record/Spec/Status
+2. **No caching** - always hit database, for now
 3. **Type = group/version/kind** - single string
 4. **No UID** - key is Type+Tradespace+Name
 5. **Labels queryable** - stored and indexed
 6. **Data is opaque JSON** - storage doesn't parse it
 7. **Core schemas hardcoded** - bootstrap problem
-8. **Authentication** - For now, only TLS authentication, start the server with a specified (multiple?) certificate authorities. In the future we'll add more options.
-9. **Migrations** - Entity schemas are immutable, schema change = new version.
+8. **Authentication** - For now, only TLS authentication
+9. **Migrations** - Record schemas are immutable, schema change = new version
 
 
 ## Not Implemented Yet
@@ -131,8 +146,9 @@ type RecordStorage interface {
 
 ## Commands
 ```bash
-go test ./... -v    # Run tests
-go mod tidy         # Tidy dependencies
+go test ./... -v      # Run tests
+go mod tidy           # Tidy dependencies
+docker-compose up -d  # Start Redis Stack
 ```
 
 ## Tech Stack
@@ -140,13 +156,4 @@ go mod tidy         # Tidy dependencies
 - SQLite (modernc.org/sqlite - pure Go)
 - Redis Stack (TimeSeries, Streams)
 - gojsonschema (JSON Schema validation)
-- Future: PostgreSQL, gRPC
-
-
-## Commands
-```bash
-docker-compose up -d  # Start Redis Stack
-```
-
-TODOS:
-  1. ~~Use a 3rd-party library for validation of OpenAPI3 Spec~~ ✓ (using gojsonschema) 
+- Future: PostgreSQL, gRPC, buf
