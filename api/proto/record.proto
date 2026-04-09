@@ -7,35 +7,35 @@ option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;market
 import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
-// EntityService provides CRUD operations for entities.
-service EntityService {
-  // Create creates a new entity.
+// RecordService provides CRUD operations for records.
+service RecordService {
+  // Create creates a new record.
   rpc Create(CreateRequest) returns (CreateResponse);
 
-  // Get retrieves an entity by key.
+  // Get retrieves a record by key.
   rpc Get(GetRequest) returns (GetResponse);
 
-  // Update updates an existing entity.
+  // Update updates an existing record.
   rpc Update(UpdateRequest) returns (UpdateResponse);
 
-  // Delete removes an entity.
+  // Delete removes a record.
   rpc Delete(DeleteRequest) returns (DeleteResponse);
 
-  // List returns entities matching the query.
+  // List returns records matching the query.
   rpc List(ListRequest) returns (ListResponse);
 
-  // Watch streams entity change events.
+  // Watch streams record change events.
   rpc Watch(WatchRequest) returns (stream WatchEvent);
 }
 
-// TypeMeta describes the type of an entity.
+// TypeMeta describes the type of a record.
 message TypeMeta {
   string group = 1;
   string version = 2;
   string kind = 3;
 }
 
-// ObjectMeta contains metadata about an entity.
+// ObjectMeta contains metadata about a record.
 message ObjectMeta {
   string name = 1;
   string tradespace = 2;
@@ -46,8 +46,8 @@ message ObjectMeta {
   google.protobuf.Timestamp updated_at = 7;
 }
 
-// Entity is the generic wrapper for all resources.
-message Entity {
+// Record is the generic wrapper for all resources.
+message Record {
   TypeMeta type_meta = 1;
   ObjectMeta object_meta = 2;
   google.protobuf.Struct spec = 3;
@@ -56,12 +56,12 @@ message Entity {
 
 // CreateRequest is the request for Create.
 message CreateRequest {
-  Entity entity = 1;
+  Record record = 1;
 }
 
 // CreateResponse is the response for Create.
 message CreateResponse {
-  Entity entity = 1;
+  Record record = 1;
 }
 
 // GetRequest is the request for Get.
@@ -73,17 +73,17 @@ message GetRequest {
 
 // GetResponse is the response for Get.
 message GetResponse {
-  Entity entity = 1;
+  Record record = 1;
 }
 
 // UpdateRequest is the request for Update.
 message UpdateRequest {
-  Entity entity = 1;
+  Record record = 1;
 }
 
 // UpdateResponse is the response for Update.
 message UpdateResponse {
-  Entity entity = 1;
+  Record record = 1;
 }
 
 // DeleteRequest is the request for Delete.
@@ -105,16 +105,16 @@ message ListRequest {
 
 // ListResponse is the response for List.
 message ListResponse {
-  repeated Entity entities = 1;
+  repeated Record records = 1;
 }
 
 // WatchRequest is the request for Watch.
 message WatchRequest {
-  string type = 1;  // entity type to watch
+  string type = 1;  // record type to watch
 }
 
 // WatchEvent is a change event streamed by Watch.
 message WatchEvent {
   string action = 1;  // "created", "updated", "deleted"
-  Entity entity = 2;
+  Record record = 2;
 }
