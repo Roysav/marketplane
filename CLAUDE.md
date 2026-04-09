@@ -136,6 +136,7 @@ go mod tidy         # Tidy dependencies
 - Go 1.22+
 - SQLite (modernc.org/sqlite - pure Go)
 - Redis Stack (TimeSeries, Streams)
+- gojsonschema (JSON Schema validation)
 - Future: PostgreSQL, gRPC
 
 
@@ -145,4 +146,4 @@ docker-compose up -d  # Start Redis Stack
 ```
 
 TODOS:
-  1. Use a 3rd-party library for validation of OpenAPI3 Spec... 
+  1. ~~Use a 3rd-party library for validation of OpenAPI3 Spec~~ ✓ (using gojsonschema) 
