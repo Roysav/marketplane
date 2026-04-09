@@ -3,7 +3,13 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"time"
+)
+
+var (
+	ErrNotFound      = errors.New("not found")
+	ErrAlreadyExists = errors.New("already exists")
 )
 
 // Key uniquely identifies a record.

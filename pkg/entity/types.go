@@ -33,6 +33,35 @@ func (t TypeMeta) GVK() GroupVersionKind {
 	return GroupVersionKind{Group: t.Group, Version: t.Version, Kind: t.Kind}
 }
 
+// TypeMetaFromType parses a type string like "core/v1/Tradespace" into TypeMeta.
+func TypeMetaFromType(typeStr string) TypeMeta {
+	gvk := ParseType(typeStr)
+	return TypeMeta{Group: gvk.Group, Version: gvk.Version, Kind: gvk.Kind}
+}
+
+// ParseType parses a type string like "core/v1/Tradespace" into GroupVersionKind.
+func ParseType(typeStr string) GroupVersionKind {
+	var group, version, kind string
+	parts := splitType(typeStr)
+	if len(parts) >= 3 {
+		group, version, kind = parts[0], parts[1], parts[2]
+	}
+	return GroupVersionKind{Group: group, Version: version, Kind: kind}
+}
+
+func splitType(s string) []string {
+	var parts []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '/' {
+			parts = append(parts, s[start:i])
+			start = i + 1
+		}
+	}
+	parts = append(parts, s[start:])
+	return parts
+}
+
 // ObjectMeta contains metadata about an entity.
 type ObjectMeta struct {
 	Name            string            `json:"name"`
