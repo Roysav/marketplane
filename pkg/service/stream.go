@@ -14,9 +14,22 @@ import (
 )
 
 var (
-	ErrStreamNotFound     = errors.New("stream definition not found")
-	ErrStreamValidation   = errors.New("stream data validation failed")
+	ErrStreamNotFound   = errors.New("stream definition not found")
+	ErrStreamValidation = errors.New("stream data validation failed")
 )
+
+// StreamKey uniquely identifies a stream.
+type StreamKey struct {
+	Group   string
+	Version string
+	Kind    string
+	Name    string
+}
+
+// String returns the full key as group/version/kind/name.
+func (k StreamKey) String() string {
+	return fmt.Sprintf("%s/%s/%s/%s", k.Group, k.Version, k.Kind, k.Name)
+}
 
 // StreamDefinitionSpec represents the spec of a StreamDefinition record.
 type StreamDefinitionSpec struct {
@@ -55,8 +68,8 @@ func NewStreamService(cfg StreamServiceConfig) *StreamService {
 }
 
 // Append adds a data point to the stream.
-func (s *StreamService) Append(ctx context.Context, name string, ts time.Time, data map[string]any) error {
-	def, err := s.getDefinition(ctx, name)
+func (s *StreamService) Append(ctx context.Context, key StreamKey, ts time.Time, data map[string]any) error {
+	def, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return err
 	}
@@ -74,166 +87,63 @@ func (s *StreamService) Append(ctx context.Context, name string, ts time.Time, d
 		return fmt.Errorf("failed to marshal data: %w", err)
 	}
 
-	key := s.streamKey(def, name)
-	s.logger.Debug("appending to stream", "name", name, "key", key, "timestamp", ts)
+	streamKey := key.String()
+	s.logger.Debug("appending to stream", "key", streamKey, "timestamp", ts)
 
-	return s.streams.Add(ctx, key, ts, string(jsonData))
+	return s.streams.Add(ctx, streamKey, ts, string(jsonData))
 }
 
 // Latest gets the most recent entry from the stream.
-func (s *StreamService) Latest(ctx context.Context, name string) (*storage.StreamEntry, error) {
-	def, err := s.getDefinition(ctx, name)
+func (s *StreamService) Latest(ctx context.Context, key StreamKey) (*storage.StreamEntry, error) {
+	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
-	key := s.streamKey(def, name)
-	s.logger.Debug("getting latest from stream", "name", name, "key", key)
+	streamKey := key.String()
+	s.logger.Debug("getting latest from stream", "key", streamKey)
 
-	return s.streams.Latest(ctx, key)
+	return s.streams.Latest(ctx, streamKey)
 }
 
 // Range gets entries within a time range.
-func (s *StreamService) Range(ctx context.Context, name string, from, to time.Time) ([]*storage.StreamEntry, error) {
-	def, err := s.getDefinition(ctx, name)
+func (s *StreamService) Range(ctx context.Context, key StreamKey, from, to time.Time) ([]*storage.StreamEntry, error) {
+	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
-	key := s.streamKey(def, name)
-	s.logger.Debug("getting range from stream", "name", name, "key", key, "from", from, "to", to)
+	streamKey := key.String()
+	s.logger.Debug("getting range from stream", "key", streamKey, "from", from, "to", to)
 
-	return s.streams.Range(ctx, key, from, to)
+	return s.streams.Range(ctx, streamKey, from, to)
 }
 
-// WatchFilter specifies which streams to watch.
-type WatchFilter struct {
-	Name  string // Specific StreamDefinition name
-	Group string // Filter by group
-	Kind  string // Filter by kind
-}
-
-// Watch subscribes to new entries on streams matching the filter.
-func (s *StreamService) Watch(ctx context.Context, filter WatchFilter) (<-chan storage.WatchEvent, error) {
-	// If name is specified, watch single stream
-	if filter.Name != "" {
-		return s.watchSingle(ctx, filter.Name)
-	}
-
-	// Otherwise watch by group/kind pattern
-	return s.watchPattern(ctx, filter.Group, filter.Kind)
-}
-
-// watchSingle watches a single stream by name.
-func (s *StreamService) watchSingle(ctx context.Context, name string) (<-chan storage.WatchEvent, error) {
-	def, err := s.getDefinition(ctx, name)
+// Watch subscribes to new entries on the stream.
+func (s *StreamService) Watch(ctx context.Context, key StreamKey) (<-chan storage.WatchEvent, error) {
+	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
-	key := s.streamKey(def, name)
-	s.logger.Debug("watching stream", "name", name, "key", key)
+	streamKey := key.String()
+	s.logger.Debug("watching stream", "key", streamKey)
 
-	return s.streams.Watch(ctx, key)
+	return s.streams.Watch(ctx, streamKey)
 }
 
-// watchPattern watches all streams matching group/kind.
-func (s *StreamService) watchPattern(ctx context.Context, group, kind string) (<-chan storage.WatchEvent, error) {
-	// Find all matching StreamDefinitions
-	defs, err := s.listDefinitions(ctx, group, kind)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(defs) == 0 {
-		return nil, fmt.Errorf("%w: no streams match group=%s kind=%s", ErrStreamNotFound, group, kind)
-	}
-
-	// Create merged channel
-	merged := make(chan storage.WatchEvent, 100)
-
-	// Start watching each stream
-	for _, def := range defs {
-		key := s.streamKey(&def.spec, def.name)
-		ch, err := s.streams.Watch(ctx, key)
-		if err != nil {
-			s.logger.Warn("failed to watch stream", "name", def.name, "error", err)
-			continue
-		}
-
-		// Forward events to merged channel
-		go func(name string, ch <-chan storage.WatchEvent) {
-			for event := range ch {
-				select {
-				case merged <- event:
-				case <-ctx.Done():
-					return
-				}
-			}
-		}(def.name, ch)
-	}
-
-	// Close merged channel when context is done
-	go func() {
-		<-ctx.Done()
-		close(merged)
-	}()
-
-	s.logger.Debug("watching streams by pattern", "group", group, "kind", kind, "count", len(defs))
-
-	return merged, nil
-}
-
-type streamDefWithName struct {
-	name string
-	spec StreamDefinitionSpec
-}
-
-// listDefinitions returns StreamDefinitions matching group/kind.
-func (s *StreamService) listDefinitions(ctx context.Context, group, kind string) ([]streamDefWithName, error) {
-	// List all StreamDefinitions
-	rows, err := s.rows.List(ctx, storage.Query{
-		Type:       "core/v1/StreamDefinition",
-		Tradespace: "default",
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var results []streamDefWithName
-	for _, row := range rows {
-		var spec StreamDefinitionSpec
-		if err := json.Unmarshal([]byte(row.Data), &spec); err != nil {
-			continue
-		}
-
-		// Filter by group/kind
-		if group != "" && spec.Group != group {
-			continue
-		}
-		if kind != "" && spec.Kind != kind {
-			continue
-		}
-
-		results = append(results, streamDefWithName{
-			name: row.Name,
-			spec: spec,
-		})
-	}
-
-	return results, nil
-}
-
-// getDefinition retrieves the StreamDefinition by name.
-func (s *StreamService) getDefinition(ctx context.Context, name string) (*StreamDefinitionSpec, error) {
+// getDefinition retrieves the StreamDefinition by key.
+func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*StreamDefinitionSpec, error) {
+	// StreamDefinition is stored with name as the identifier
+	// We need to find the one that matches group/version/kind
 	row, err := s.rows.Get(ctx, storage.Key{
 		Type:       "core/v1/StreamDefinition",
 		Tradespace: "default",
-		Name:       name,
+		Name:       key.Name,
 	})
 	if err != nil {
-		s.logger.Warn("stream definition not found", "name", name, "error", err)
-		return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, name)
+		s.logger.Warn("stream definition not found", "key", key.String(), "error", err)
+		return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
 	}
 
 	var spec StreamDefinitionSpec
@@ -241,12 +151,15 @@ func (s *StreamService) getDefinition(ctx context.Context, name string) (*Stream
 		return nil, fmt.Errorf("invalid stream definition data: %w", err)
 	}
 
-	return &spec, nil
-}
+	// Verify the spec matches the requested key
+	if spec.Group != key.Group || spec.Version != key.Version || spec.Kind != key.Kind {
+		s.logger.Warn("stream definition mismatch",
+			"requested", key.String(),
+			"found", fmt.Sprintf("%s/%s/%s", spec.Group, spec.Version, spec.Kind))
+		return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
+	}
 
-// streamKey derives the Redis stream key from the definition.
-func (s *StreamService) streamKey(def *StreamDefinitionSpec, name string) string {
-	return fmt.Sprintf("%s/%s/%s/%s", def.Group, def.Version, def.Kind, name)
+	return &spec, nil
 }
 
 // validateData validates data against a JSON schema.

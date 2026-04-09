@@ -37,7 +37,7 @@ func newTestStreamService(t *testing.T) (*StreamService, *goredis.Client) {
 	}), redisClient
 }
 
-func createTestStreamDefinition(t *testing.T, s *StreamService, name string) {
+func createTestStreamDefinition(t *testing.T, s *StreamService, name string) StreamKey {
 	t.Helper()
 	ctx := context.Background()
 
@@ -61,20 +61,27 @@ func createTestStreamDefinition(t *testing.T, s *StreamService, name string) {
 	if err != nil {
 		t.Fatalf("failed to create stream definition: %v", err)
 	}
+
+	return StreamKey{
+		Group:   "Binance.MarketFeed",
+		Version: "v1alpha1",
+		Kind:    "Quotes",
+		Name:    name,
+	}
 }
 
 func TestStreamService_AppendAndLatest(t *testing.T) {
 	ctx := context.Background()
 	s, redisClient := newTestStreamService(t)
 
-	// Clean up test stream
-	redisClient.Del(ctx, "stream:Binance.MarketFeed/v1alpha1/Quotes/btcusdt")
+	key := createTestStreamDefinition(t, s, "btcusdt")
 
-	createTestStreamDefinition(t, s, "btcusdt")
+	// Clean up test stream
+	redisClient.Del(ctx, "stream:"+key.String())
 
 	// Append data
 	ts := time.Now()
-	err := s.Append(ctx, "btcusdt", ts, map[string]any{
+	err := s.Append(ctx, key, ts, map[string]any{
 		"last_price": "67432.50",
 	})
 	if err != nil {
@@ -82,7 +89,7 @@ func TestStreamService_AppendAndLatest(t *testing.T) {
 	}
 
 	// Get latest
-	entry, err := s.Latest(ctx, "btcusdt")
+	entry, err := s.Latest(ctx, key)
 	if err != nil {
 		t.Fatalf("Latest failed: %v", err)
 	}
@@ -96,11 +103,11 @@ func TestStreamService_AppendValidation(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newTestStreamService(t)
 
-	createTestStreamDefinition(t, s, "ethusdt")
+	key := createTestStreamDefinition(t, s, "ethusdt")
 
 	// Append without required field should fail
 	ts := time.Now()
-	err := s.Append(ctx, "ethusdt", ts, map[string]any{
+	err := s.Append(ctx, key, ts, map[string]any{
 		"volume": "1000",
 	})
 	if err == nil {
@@ -115,17 +122,17 @@ func TestStreamService_Range(t *testing.T) {
 	ctx := context.Background()
 	s, redisClient := newTestStreamService(t)
 
-	// Clean up test stream
-	redisClient.Del(ctx, "stream:Binance.MarketFeed/v1alpha1/Quotes/solusdt")
+	key := createTestStreamDefinition(t, s, "solusdt")
 
-	createTestStreamDefinition(t, s, "solusdt")
+	// Clean up test stream
+	redisClient.Del(ctx, "stream:"+key.String())
 
 	base := time.Now().Truncate(time.Second)
 
 	// Add multiple entries
 	for i := 0; i < 5; i++ {
 		ts := base.Add(time.Duration(i) * time.Second)
-		err := s.Append(ctx, "solusdt", ts, map[string]any{
+		err := s.Append(ctx, key, ts, map[string]any{
 			"last_price": "150.00",
 		})
 		if err != nil {
@@ -134,7 +141,7 @@ func TestStreamService_Range(t *testing.T) {
 	}
 
 	// Query range (first 3 entries)
-	entries, err := s.Range(ctx, "solusdt", base, base.Add(2*time.Second))
+	entries, err := s.Range(ctx, key, base, base.Add(2*time.Second))
 	if err != nil {
 		t.Fatalf("Range failed: %v", err)
 	}
@@ -150,13 +157,13 @@ func TestStreamService_Watch(t *testing.T) {
 
 	s, redisClient := newTestStreamService(t)
 
+	key := createTestStreamDefinition(t, s, "avaxusdt")
+
 	// Clean up test stream
-	redisClient.Del(ctx, "stream:Binance.MarketFeed/v1alpha1/Quotes/avaxusdt")
+	redisClient.Del(ctx, "stream:"+key.String())
 
-	createTestStreamDefinition(t, s, "avaxusdt")
-
-	// Start watching by name
-	ch, err := s.Watch(ctx, WatchFilter{Name: "avaxusdt"})
+	// Start watching
+	ch, err := s.Watch(ctx, key)
 	if err != nil {
 		t.Fatalf("Watch failed: %v", err)
 	}
@@ -166,7 +173,7 @@ func TestStreamService_Watch(t *testing.T) {
 
 	// Append data
 	ts := time.Now()
-	err = s.Append(ctx, "avaxusdt", ts, map[string]any{
+	err = s.Append(ctx, key, ts, map[string]any{
 		"last_price": "35.50",
 	})
 	if err != nil {
@@ -188,9 +195,40 @@ func TestStreamService_NotFound(t *testing.T) {
 	ctx := context.Background()
 	s, _ := newTestStreamService(t)
 
-	_, err := s.Latest(ctx, "nonexistent")
+	key := StreamKey{
+		Group:   "nonexistent",
+		Version: "v1",
+		Kind:    "Test",
+		Name:    "missing",
+	}
+
+	_, err := s.Latest(ctx, key)
 	if err == nil {
 		t.Error("expected error, got nil")
+	}
+	if !errors.Is(err, ErrStreamNotFound) {
+		t.Errorf("expected ErrStreamNotFound, got: %v", err)
+	}
+}
+
+func TestStreamService_KeyMismatch(t *testing.T) {
+	ctx := context.Background()
+	s, _ := newTestStreamService(t)
+
+	// Create a stream definition
+	createTestStreamDefinition(t, s, "linkusdt")
+
+	// Try to access with wrong group/version/kind
+	key := StreamKey{
+		Group:   "WrongGroup",
+		Version: "v1alpha1",
+		Kind:    "Quotes",
+		Name:    "linkusdt",
+	}
+
+	_, err := s.Latest(ctx, key)
+	if err == nil {
+		t.Error("expected error for mismatched key, got nil")
 	}
 	if !errors.Is(err, ErrStreamNotFound) {
 		t.Errorf("expected ErrStreamNotFound, got: %v", err)

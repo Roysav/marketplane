@@ -23,10 +23,79 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// StreamKey uniquely identifies a stream. All fields are required.
+type StreamKey struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Group         string                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`     // e.g., "Binance.MarketFeed"
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"` // e.g., "v1alpha1"
+	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`       // e.g., "Quotes"
+	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`       // e.g., "btcusdt"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamKey) Reset() {
+	*x = StreamKey{}
+	mi := &file_stream_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamKey) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamKey) ProtoMessage() {}
+
+func (x *StreamKey) ProtoReflect() protoreflect.Message {
+	mi := &file_stream_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamKey.ProtoReflect.Descriptor instead.
+func (*StreamKey) Descriptor() ([]byte, []int) {
+	return file_stream_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *StreamKey) GetGroup() string {
+	if x != nil {
+		return x.Group
+	}
+	return ""
+}
+
+func (x *StreamKey) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *StreamKey) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *StreamKey) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 // AppendRequest is the request for Append.
 type AppendRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // StreamDefinition name (e.g., "btcusdt")
+	Key           *StreamKey             `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Data          *structpb.Struct       `protobuf:"bytes,3,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -35,7 +104,7 @@ type AppendRequest struct {
 
 func (x *AppendRequest) Reset() {
 	*x = AppendRequest{}
-	mi := &file_stream_proto_msgTypes[0]
+	mi := &file_stream_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -47,7 +116,7 @@ func (x *AppendRequest) String() string {
 func (*AppendRequest) ProtoMessage() {}
 
 func (x *AppendRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[0]
+	mi := &file_stream_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -60,14 +129,14 @@ func (x *AppendRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendRequest.ProtoReflect.Descriptor instead.
 func (*AppendRequest) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{0}
+	return file_stream_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *AppendRequest) GetName() string {
+func (x *AppendRequest) GetKey() *StreamKey {
 	if x != nil {
-		return x.Name
+		return x.Key
 	}
-	return ""
+	return nil
 }
 
 func (x *AppendRequest) GetTimestamp() *timestamppb.Timestamp {
@@ -93,7 +162,7 @@ type AppendResponse struct {
 
 func (x *AppendResponse) Reset() {
 	*x = AppendResponse{}
-	mi := &file_stream_proto_msgTypes[1]
+	mi := &file_stream_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -105,7 +174,7 @@ func (x *AppendResponse) String() string {
 func (*AppendResponse) ProtoMessage() {}
 
 func (x *AppendResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[1]
+	mi := &file_stream_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -118,20 +187,20 @@ func (x *AppendResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AppendResponse.ProtoReflect.Descriptor instead.
 func (*AppendResponse) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{1}
+	return file_stream_proto_rawDescGZIP(), []int{2}
 }
 
 // LatestRequest is the request for Latest.
 type LatestRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // StreamDefinition name
+	Key           *StreamKey             `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *LatestRequest) Reset() {
 	*x = LatestRequest{}
-	mi := &file_stream_proto_msgTypes[2]
+	mi := &file_stream_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -143,7 +212,7 @@ func (x *LatestRequest) String() string {
 func (*LatestRequest) ProtoMessage() {}
 
 func (x *LatestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[2]
+	mi := &file_stream_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -156,14 +225,14 @@ func (x *LatestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LatestRequest.ProtoReflect.Descriptor instead.
 func (*LatestRequest) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{2}
+	return file_stream_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *LatestRequest) GetName() string {
+func (x *LatestRequest) GetKey() *StreamKey {
 	if x != nil {
-		return x.Name
+		return x.Key
 	}
-	return ""
+	return nil
 }
 
 // LatestResponse is the response for Latest.
@@ -176,7 +245,7 @@ type LatestResponse struct {
 
 func (x *LatestResponse) Reset() {
 	*x = LatestResponse{}
-	mi := &file_stream_proto_msgTypes[3]
+	mi := &file_stream_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -188,7 +257,7 @@ func (x *LatestResponse) String() string {
 func (*LatestResponse) ProtoMessage() {}
 
 func (x *LatestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[3]
+	mi := &file_stream_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -201,7 +270,7 @@ func (x *LatestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LatestResponse.ProtoReflect.Descriptor instead.
 func (*LatestResponse) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{3}
+	return file_stream_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *LatestResponse) GetEntry() *StreamEntry {
@@ -214,7 +283,7 @@ func (x *LatestResponse) GetEntry() *StreamEntry {
 // RangeRequest is the request for Range.
 type RangeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"` // StreamDefinition name
+	Key           *StreamKey             `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	From          *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
 	To            *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=to,proto3" json:"to,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -223,7 +292,7 @@ type RangeRequest struct {
 
 func (x *RangeRequest) Reset() {
 	*x = RangeRequest{}
-	mi := &file_stream_proto_msgTypes[4]
+	mi := &file_stream_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -235,7 +304,7 @@ func (x *RangeRequest) String() string {
 func (*RangeRequest) ProtoMessage() {}
 
 func (x *RangeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[4]
+	mi := &file_stream_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -248,14 +317,14 @@ func (x *RangeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeRequest.ProtoReflect.Descriptor instead.
 func (*RangeRequest) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{4}
+	return file_stream_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *RangeRequest) GetName() string {
+func (x *RangeRequest) GetKey() *StreamKey {
 	if x != nil {
-		return x.Name
+		return x.Key
 	}
-	return ""
+	return nil
 }
 
 func (x *RangeRequest) GetFrom() *timestamppb.Timestamp {
@@ -282,7 +351,7 @@ type RangeResponse struct {
 
 func (x *RangeResponse) Reset() {
 	*x = RangeResponse{}
-	mi := &file_stream_proto_msgTypes[5]
+	mi := &file_stream_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -294,7 +363,7 @@ func (x *RangeResponse) String() string {
 func (*RangeResponse) ProtoMessage() {}
 
 func (x *RangeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[5]
+	mi := &file_stream_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -307,7 +376,7 @@ func (x *RangeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RangeResponse.ProtoReflect.Descriptor instead.
 func (*RangeResponse) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{5}
+	return file_stream_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RangeResponse) GetEntries() []*StreamEntry {
@@ -317,20 +386,17 @@ func (x *RangeResponse) GetEntries() []*StreamEntry {
 	return nil
 }
 
-// StreamWatchRequest is the request for stream Watch.
-// At least one of name, kind, or group must be specified.
+// StreamWatchRequest is the request for Watch.
 type StreamWatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`   // StreamDefinition name (e.g., "btcusdt")
-	Group         string                 `protobuf:"bytes,2,opt,name=group,proto3" json:"group,omitempty"` // Filter by group (e.g., "Binance.MarketFeed")
-	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`   // Filter by kind (e.g., "Quotes")
+	Key           *StreamKey             `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *StreamWatchRequest) Reset() {
 	*x = StreamWatchRequest{}
-	mi := &file_stream_proto_msgTypes[6]
+	mi := &file_stream_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -342,7 +408,7 @@ func (x *StreamWatchRequest) String() string {
 func (*StreamWatchRequest) ProtoMessage() {}
 
 func (x *StreamWatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[6]
+	mi := &file_stream_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -355,34 +421,20 @@ func (x *StreamWatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamWatchRequest.ProtoReflect.Descriptor instead.
 func (*StreamWatchRequest) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{6}
+	return file_stream_proto_rawDescGZIP(), []int{7}
 }
 
-func (x *StreamWatchRequest) GetName() string {
+func (x *StreamWatchRequest) GetKey() *StreamKey {
 	if x != nil {
-		return x.Name
+		return x.Key
 	}
-	return ""
-}
-
-func (x *StreamWatchRequest) GetGroup() string {
-	if x != nil {
-		return x.Group
-	}
-	return ""
-}
-
-func (x *StreamWatchRequest) GetKind() string {
-	if x != nil {
-		return x.Kind
-	}
-	return ""
+	return nil
 }
 
 // StreamEntry is a data point in a stream.
 type StreamEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Key           *StreamKey             `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
 	Value         string                 `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"` // JSON blob
 	unknownFields protoimpl.UnknownFields
@@ -391,7 +443,7 @@ type StreamEntry struct {
 
 func (x *StreamEntry) Reset() {
 	*x = StreamEntry{}
-	mi := &file_stream_proto_msgTypes[7]
+	mi := &file_stream_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -403,7 +455,7 @@ func (x *StreamEntry) String() string {
 func (*StreamEntry) ProtoMessage() {}
 
 func (x *StreamEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_stream_proto_msgTypes[7]
+	mi := &file_stream_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -416,14 +468,14 @@ func (x *StreamEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamEntry.ProtoReflect.Descriptor instead.
 func (*StreamEntry) Descriptor() ([]byte, []int) {
-	return file_stream_proto_rawDescGZIP(), []int{7}
+	return file_stream_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *StreamEntry) GetKey() string {
+func (x *StreamEntry) GetKey() *StreamKey {
 	if x != nil {
 		return x.Key
 	}
-	return ""
+	return nil
 }
 
 func (x *StreamEntry) GetTimestamp() *timestamppb.Timestamp {
@@ -444,28 +496,31 @@ var File_stream_proto protoreflect.FileDescriptor
 
 const file_stream_proto_rawDesc = "" +
 	"\n" +
-	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x8a\x01\n" +
-	"\rAppendRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x128\n" +
+	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"c\n" +
+	"\tStreamKey\x12\x14\n" +
+	"\x05group\x18\x01 \x01(\tR\x05group\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\x12\x12\n" +
+	"\x04name\x18\x04 \x01(\tR\x04name\"\xa3\x01\n" +
+	"\rAppendRequest\x12+\n" +
+	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12+\n" +
 	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\"\x10\n" +
-	"\x0eAppendResponse\"#\n" +
-	"\rLatestRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\"C\n" +
+	"\x0eAppendResponse\"<\n" +
+	"\rLatestRequest\x12+\n" +
+	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\"C\n" +
 	"\x0eLatestResponse\x121\n" +
-	"\x05entry\x18\x01 \x01(\v2\x1b.marketplane.v1.StreamEntryR\x05entry\"~\n" +
-	"\fRangeRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12.\n" +
+	"\x05entry\x18\x01 \x01(\v2\x1b.marketplane.v1.StreamEntryR\x05entry\"\x97\x01\n" +
+	"\fRangeRequest\x12+\n" +
+	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\x12.\n" +
 	"\x04from\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x04from\x12*\n" +
 	"\x02to\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\x02to\"F\n" +
 	"\rRangeResponse\x125\n" +
-	"\aentries\x18\x01 \x03(\v2\x1b.marketplane.v1.StreamEntryR\aentries\"R\n" +
-	"\x12StreamWatchRequest\x12\x12\n" +
-	"\x04name\x18\x01 \x01(\tR\x04name\x12\x14\n" +
-	"\x05group\x18\x02 \x01(\tR\x05group\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\"o\n" +
-	"\vStreamEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x128\n" +
+	"\aentries\x18\x01 \x03(\v2\x1b.marketplane.v1.StreamEntryR\aentries\"A\n" +
+	"\x12StreamWatchRequest\x12+\n" +
+	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\"\x8a\x01\n" +
+	"\vStreamEntry\x12+\n" +
+	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x14\n" +
 	"\x05value\x18\x03 \x01(\tR\x05value2\xb3\x02\n" +
 	"\rStreamService\x12G\n" +
@@ -486,40 +541,46 @@ func file_stream_proto_rawDescGZIP() []byte {
 	return file_stream_proto_rawDescData
 }
 
-var file_stream_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_stream_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_stream_proto_goTypes = []any{
-	(*AppendRequest)(nil),         // 0: marketplane.v1.AppendRequest
-	(*AppendResponse)(nil),        // 1: marketplane.v1.AppendResponse
-	(*LatestRequest)(nil),         // 2: marketplane.v1.LatestRequest
-	(*LatestResponse)(nil),        // 3: marketplane.v1.LatestResponse
-	(*RangeRequest)(nil),          // 4: marketplane.v1.RangeRequest
-	(*RangeResponse)(nil),         // 5: marketplane.v1.RangeResponse
-	(*StreamWatchRequest)(nil),    // 6: marketplane.v1.StreamWatchRequest
-	(*StreamEntry)(nil),           // 7: marketplane.v1.StreamEntry
-	(*timestamppb.Timestamp)(nil), // 8: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),       // 9: google.protobuf.Struct
+	(*StreamKey)(nil),             // 0: marketplane.v1.StreamKey
+	(*AppendRequest)(nil),         // 1: marketplane.v1.AppendRequest
+	(*AppendResponse)(nil),        // 2: marketplane.v1.AppendResponse
+	(*LatestRequest)(nil),         // 3: marketplane.v1.LatestRequest
+	(*LatestResponse)(nil),        // 4: marketplane.v1.LatestResponse
+	(*RangeRequest)(nil),          // 5: marketplane.v1.RangeRequest
+	(*RangeResponse)(nil),         // 6: marketplane.v1.RangeResponse
+	(*StreamWatchRequest)(nil),    // 7: marketplane.v1.StreamWatchRequest
+	(*StreamEntry)(nil),           // 8: marketplane.v1.StreamEntry
+	(*timestamppb.Timestamp)(nil), // 9: google.protobuf.Timestamp
+	(*structpb.Struct)(nil),       // 10: google.protobuf.Struct
 }
 var file_stream_proto_depIdxs = []int32{
-	8,  // 0: marketplane.v1.AppendRequest.timestamp:type_name -> google.protobuf.Timestamp
-	9,  // 1: marketplane.v1.AppendRequest.data:type_name -> google.protobuf.Struct
-	7,  // 2: marketplane.v1.LatestResponse.entry:type_name -> marketplane.v1.StreamEntry
-	8,  // 3: marketplane.v1.RangeRequest.from:type_name -> google.protobuf.Timestamp
-	8,  // 4: marketplane.v1.RangeRequest.to:type_name -> google.protobuf.Timestamp
-	7,  // 5: marketplane.v1.RangeResponse.entries:type_name -> marketplane.v1.StreamEntry
-	8,  // 6: marketplane.v1.StreamEntry.timestamp:type_name -> google.protobuf.Timestamp
-	0,  // 7: marketplane.v1.StreamService.Append:input_type -> marketplane.v1.AppendRequest
-	2,  // 8: marketplane.v1.StreamService.Latest:input_type -> marketplane.v1.LatestRequest
-	4,  // 9: marketplane.v1.StreamService.Range:input_type -> marketplane.v1.RangeRequest
-	6,  // 10: marketplane.v1.StreamService.Watch:input_type -> marketplane.v1.StreamWatchRequest
-	1,  // 11: marketplane.v1.StreamService.Append:output_type -> marketplane.v1.AppendResponse
-	3,  // 12: marketplane.v1.StreamService.Latest:output_type -> marketplane.v1.LatestResponse
-	5,  // 13: marketplane.v1.StreamService.Range:output_type -> marketplane.v1.RangeResponse
-	7,  // 14: marketplane.v1.StreamService.Watch:output_type -> marketplane.v1.StreamEntry
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 0: marketplane.v1.AppendRequest.key:type_name -> marketplane.v1.StreamKey
+	9,  // 1: marketplane.v1.AppendRequest.timestamp:type_name -> google.protobuf.Timestamp
+	10, // 2: marketplane.v1.AppendRequest.data:type_name -> google.protobuf.Struct
+	0,  // 3: marketplane.v1.LatestRequest.key:type_name -> marketplane.v1.StreamKey
+	8,  // 4: marketplane.v1.LatestResponse.entry:type_name -> marketplane.v1.StreamEntry
+	0,  // 5: marketplane.v1.RangeRequest.key:type_name -> marketplane.v1.StreamKey
+	9,  // 6: marketplane.v1.RangeRequest.from:type_name -> google.protobuf.Timestamp
+	9,  // 7: marketplane.v1.RangeRequest.to:type_name -> google.protobuf.Timestamp
+	8,  // 8: marketplane.v1.RangeResponse.entries:type_name -> marketplane.v1.StreamEntry
+	0,  // 9: marketplane.v1.StreamWatchRequest.key:type_name -> marketplane.v1.StreamKey
+	0,  // 10: marketplane.v1.StreamEntry.key:type_name -> marketplane.v1.StreamKey
+	9,  // 11: marketplane.v1.StreamEntry.timestamp:type_name -> google.protobuf.Timestamp
+	1,  // 12: marketplane.v1.StreamService.Append:input_type -> marketplane.v1.AppendRequest
+	3,  // 13: marketplane.v1.StreamService.Latest:input_type -> marketplane.v1.LatestRequest
+	5,  // 14: marketplane.v1.StreamService.Range:input_type -> marketplane.v1.RangeRequest
+	7,  // 15: marketplane.v1.StreamService.Watch:input_type -> marketplane.v1.StreamWatchRequest
+	2,  // 16: marketplane.v1.StreamService.Append:output_type -> marketplane.v1.AppendResponse
+	4,  // 17: marketplane.v1.StreamService.Latest:output_type -> marketplane.v1.LatestResponse
+	6,  // 18: marketplane.v1.StreamService.Range:output_type -> marketplane.v1.RangeResponse
+	8,  // 19: marketplane.v1.StreamService.Watch:output_type -> marketplane.v1.StreamEntry
+	16, // [16:20] is the sub-list for method output_type
+	12, // [12:16] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_stream_proto_init() }
@@ -533,7 +594,7 @@ func file_stream_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_stream_proto_rawDesc), len(file_stream_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

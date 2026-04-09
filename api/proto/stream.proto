@@ -22,9 +22,17 @@ service StreamService {
   rpc Watch(StreamWatchRequest) returns (stream StreamEntry);
 }
 
+// StreamKey uniquely identifies a stream. All fields are required.
+message StreamKey {
+  string group = 1;    // e.g., "Binance.MarketFeed"
+  string version = 2;  // e.g., "v1alpha1"
+  string kind = 3;     // e.g., "Quotes"
+  string name = 4;     // e.g., "btcusdt"
+}
+
 // AppendRequest is the request for Append.
 message AppendRequest {
-  string name = 1;  // StreamDefinition name (e.g., "btcusdt")
+  StreamKey key = 1;
   google.protobuf.Timestamp timestamp = 2;
   google.protobuf.Struct data = 3;
 }
@@ -34,7 +42,7 @@ message AppendResponse {}
 
 // LatestRequest is the request for Latest.
 message LatestRequest {
-  string name = 1;  // StreamDefinition name
+  StreamKey key = 1;
 }
 
 // LatestResponse is the response for Latest.
@@ -44,7 +52,7 @@ message LatestResponse {
 
 // RangeRequest is the request for Range.
 message RangeRequest {
-  string name = 1;  // StreamDefinition name
+  StreamKey key = 1;
   google.protobuf.Timestamp from = 2;
   google.protobuf.Timestamp to = 3;
 }
@@ -54,17 +62,14 @@ message RangeResponse {
   repeated StreamEntry entries = 1;
 }
 
-// StreamWatchRequest is the request for stream Watch.
-// At least one of name, kind, or group must be specified.
+// StreamWatchRequest is the request for Watch.
 message StreamWatchRequest {
-  string name = 1;   // StreamDefinition name (e.g., "btcusdt")
-  string group = 2;  // Filter by group (e.g., "Binance.MarketFeed")
-  string kind = 3;   // Filter by kind (e.g., "Quotes")
+  StreamKey key = 1;
 }
 
 // StreamEntry is a data point in a stream.
 message StreamEntry {
-  string key = 1;
+  StreamKey key = 1;
   google.protobuf.Timestamp timestamp = 2;
   string value = 3;  // JSON blob
 }
