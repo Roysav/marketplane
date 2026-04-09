@@ -23,7 +23,7 @@ Module: `github.com/roysav/marketplane`
 
 **Storage types:**
 - **Row** (PostgreSQL/SQLite) - persistent storage for records
-- **Stream** (Redis TimeSeries) - real-time timeseries data
+- **Stream** (Redis Streams) - real-time timeseries data (JSON values)
 - **Event** (Redis Streams) - message queue for change events
 
 ## Key Concepts
@@ -46,7 +46,8 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 ### Core Records (built-in)
 | Type | Description |
 |------|-------------|
-| `core/v1/MetaRecord` | Defines custom record types |
+| `core/v1/MetaRecord` | Defines custom record types (Row storage) |
+| `core/v1/StreamDefinition` | Defines custom stream types (Stream storage) |
 | `core/v1/Tradespace` | Isolation boundary |
 | `core/v1/Quota` | Balance limits per Tradespace |
 
@@ -55,14 +56,32 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 - Global records use `"default"` tradespace
 
 ### MetaRecord
-Define custom types declaratively:
+Define custom record types (Row storage):
 ```json
 {
   "group": "polymarket",
   "version": "v1",
   "kind": "Order",
-  "storage": "record",
   "schema": { "type": "object", "required": ["marketId"] }
+}
+```
+
+### StreamDefinition
+Define custom stream types (timeseries data):
+```json
+{
+  "group": "binance",
+  "version": "v1",
+  "kind": "Price",
+  "retention": "24h",
+  "schema": {
+    "type": "object",
+    "required": ["symbol", "last_price"],
+    "properties": {
+      "symbol": { "type": "string" },
+      "last_price": { "type": "string" }
+    }
+  }
 }
 ```
 
@@ -154,6 +173,6 @@ docker-compose up -d  # Start Redis Stack
 ## Tech Stack
 - Go 1.22+
 - SQLite (modernc.org/sqlite - pure Go)
-- Redis Stack (TimeSeries, Streams)
+- Redis Stack (Streams for timeseries and events)
 - gojsonschema (JSON Schema validation)
 - Future: PostgreSQL, gRPC, buf

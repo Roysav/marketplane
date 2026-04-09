@@ -23,14 +23,24 @@ var (
 var coreSchemas = map[string]map[string]any{
 	"core/v1/MetaRecord": {
 		"type":     "object",
-		"required": []any{"group", "version", "kind", "storage"},
+		"required": []any{"group", "version", "kind"},
 		"properties": map[string]any{
 			"group":   map[string]any{"type": "string"},
 			"version": map[string]any{"type": "string"},
 			"kind":    map[string]any{"type": "string"},
-			"storage": map[string]any{"type": "string", "enum": []any{"record", "stream"}},
 			"scope":   map[string]any{"type": "string", "enum": []any{"tradespace", "global"}},
 			"schema":  map[string]any{"type": "object"},
+		},
+	},
+	"core/v1/StreamDefinition": {
+		"type":     "object",
+		"required": []any{"group", "version", "kind"},
+		"properties": map[string]any{
+			"group":     map[string]any{"type": "string"},
+			"version":   map[string]any{"type": "string"},
+			"kind":      map[string]any{"type": "string"},
+			"schema":    map[string]any{"type": "object"},
+			"retention": map[string]any{"type": "string"},
 		},
 	},
 	"core/v1/Tradespace": {

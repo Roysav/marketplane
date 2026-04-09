@@ -61,20 +61,57 @@ func TestValidate_CoreTypes(t *testing.T) {
 					"group":   "test",
 					"version": "v1",
 					"kind":    "Foo",
-					"storage": "record",
 				},
 			},
 			wantErr: false,
 		},
 		{
-			name: "invalid MetaRecord - bad storage enum",
+			name: "invalid MetaRecord - missing kind",
 			record: &record.Record{
 				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "MetaRecord"},
 				Spec: map[string]any{
 					"group":   "test",
 					"version": "v1",
-					"kind":    "Foo",
-					"storage": "invalid",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "valid StreamDefinition",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "StreamDefinition"},
+				Spec: map[string]any{
+					"group":     "binance",
+					"version":   "v1",
+					"kind":      "Price",
+					"retention": "24h",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid StreamDefinition with schema",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "StreamDefinition"},
+				Spec: map[string]any{
+					"group":   "binance",
+					"version": "v1",
+					"kind":    "Price",
+					"schema": map[string]any{
+						"type":     "object",
+						"required": []any{"last_price"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid StreamDefinition - missing group",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "StreamDefinition"},
+				Spec: map[string]any{
+					"version": "v1",
+					"kind":    "Price",
 				},
 			},
 			wantErr: true,
@@ -104,7 +141,6 @@ func TestValidate_CustomType(t *testing.T) {
 			"group": "polymarket",
 			"version": "v1",
 			"kind": "Order",
-			"storage": "record",
 			"schema": {
 				"type": "object",
 				"required": ["marketId", "side"],
@@ -193,6 +229,7 @@ func TestIsCoreType(t *testing.T) {
 		{"core/v1/Tradespace", true},
 		{"core/v1/Quota", true},
 		{"core/v1/MetaRecord", true},
+		{"core/v1/StreamDefinition", true},
 		{"polymarket/v1/Order", false},
 	}
 
