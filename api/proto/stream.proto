@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package marketplane.v1;
+
+option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// StreamService provides operations on timeseries streams.
+service StreamService {
+  // Append adds a data point to a stream.
+  rpc Append(AppendRequest) returns (AppendResponse);
+
+  // Latest gets the most recent entry from a stream.
+  rpc Latest(LatestRequest) returns (LatestResponse);
+
+  // Range gets entries within a time range.
+  rpc Range(RangeRequest) returns (RangeResponse);
+
+  // Watch streams new entries as they arrive.
+  rpc Watch(StreamWatchRequest) returns (stream StreamEntry);
+}
+
+// AppendRequest is the request for Append.
+message AppendRequest {
+  string name = 1;  // StreamDefinition name (e.g., "btcusdt")
+  google.protobuf.Timestamp timestamp = 2;
+  google.protobuf.Struct data = 3;
+}
+
+// AppendResponse is the response for Append.
+message AppendResponse {}
+
+// LatestRequest is the request for Latest.
+message LatestRequest {
+  string name = 1;  // StreamDefinition name
+}
+
+// LatestResponse is the response for Latest.
+message LatestResponse {
+  StreamEntry entry = 1;
+}
+
+// RangeRequest is the request for Range.
+message RangeRequest {
+  string name = 1;  // StreamDefinition name
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
+}
+
+// RangeResponse is the response for Range.
+message RangeResponse {
+  repeated StreamEntry entries = 1;
+}
+
+// StreamWatchRequest is the request for stream Watch.
+// At least one of name, kind, or group must be specified.
+message StreamWatchRequest {
+  string name = 1;   // StreamDefinition name (e.g., "btcusdt")
+  string group = 2;  // Filter by group (e.g., "Binance.MarketFeed")
+  string kind = 3;   // Filter by kind (e.g., "Quotes")
+}
+
+// StreamEntry is a data point in a stream.
+message StreamEntry {
+  string key = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  string value = 3;  // JSON blob
+}

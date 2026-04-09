@@ -49,27 +49,38 @@ func main() {
 	}
 	defer rows.Close()
 
-	// Redis is optional - continue without events if unavailable
+	// Redis is optional - continue without streams/events if unavailable
 	var events *redis.EventStorage
+	var streams *redis.StreamStorage
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: *redisAddr})
 	if err != nil {
-		logger.Warn("Redis unavailable, events disabled", "error", err)
+		logger.Warn("Redis unavailable, streams and events disabled", "error", err)
 	} else {
 		events = redis.NewEventStorage(redisClient)
-		defer events.Close()
+		streams = redis.NewStreamStorage(redisClient)
+		defer redisClient.Close()
 	}
 
-	// Initialize service
+	// Initialize services
 	svc := service.New(service.Config{
 		Rows:   rows,
 		Events: events,
 		Logger: logger,
 	})
 
+	streamSvc := service.NewStreamService(service.StreamServiceConfig{
+		Rows:    rows,
+		Streams: streams,
+		Logger:  logger,
+	})
+
 	// Initialize gRPC server
 	grpcServer := grpc.NewServer()
 	srv := server.New(svc, logger)
 	srv.Register(grpcServer)
+
+	streamSrv := server.NewStreamServer(streamSvc, logger)
+	streamSrv.Register(grpcServer)
 
 	// Enable reflection for grpcurl/grpcui
 	reflection.Register(grpcServer)
