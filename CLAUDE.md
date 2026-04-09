@@ -23,7 +23,8 @@ Module: `github.com/roysav/marketplane`
 
 **Two storage types:**
 - **Record** (PostgreSQL/SQLite) - persistent entities
-- **Stream** (Redis) - real-time data, watches (not yet implemented)
+- **Stream** (Redis TimeSeries) - real-time timeseries data, watches
+- **Event** (Redis Streams) - message queue for events
 
 ## Key Concepts
 
@@ -62,9 +63,17 @@ pkg/
 │   └── types_test.go
 ├── storage/
 │   ├── storage.go         # RecordStorage interface
-│   └── sqlite/
-│       ├── sqlite.go      # SQLite implementation
-│       └── sqlite_test.go
+│   ├── stream.go          # StreamStorage interface (timeseries)
+│   ├── event.go           # EventStorage interface (message queue)
+│   ├── sqlite/
+│   │   ├── sqlite.go      # SQLite RecordStorage implementation
+│   │   └── sqlite_test.go
+│   └── redis/
+│       ├── redis.go       # Redis client setup
+│       ├── stream.go      # Redis TimeSeries implementation
+│       ├── stream_test.go
+│       ├── event.go       # Redis Streams implementation
+│       └── event_test.go
 └── validator/
     ├── validator.go       # Schema validation
     └── validator_test.go
@@ -110,7 +119,7 @@ type RecordStorage interface {
 
 ## Not Implemented Yet
 - [ ] gRPC API Server
-- [ ] Redis (Stream storage, watches)
+- [x] Redis (Stream storage, watches) ✓
 - [ ] Service layer
 - [ ] RBAC
 - [ ] Allocation (cross-tradespace funds)
@@ -126,10 +135,14 @@ go mod tidy         # Tidy dependencies
 ## Tech Stack
 - Go 1.22+
 - SQLite (modernc.org/sqlite - pure Go)
-- Future: PostgreSQL, Redis, gRPC
+- Redis Stack (TimeSeries, Streams)
+- Future: PostgreSQL, gRPC
 
+
+## Commands
+```bash
+docker-compose up -d  # Start Redis Stack
+```
 
 TODOS:
   1. Use a 3rd-party library for validation of OpenAPI3 Spec... 
-  2. Implement basic interface for stream storage. I think the initial base implementation could also benefit from sqlite, 
-       with concurrent reads to the database. This storage however should have much less options, only key-value set-get, prefix list(?maybe), and watch(prefix) 

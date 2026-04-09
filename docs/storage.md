@@ -23,7 +23,55 @@ type Record struct {
 ```
 Clear limitations on the ability to filter records in a more complex manner, as there is now way for the caller to filter json fields. this is by design.
 
-# Stream
-<!-- I really question this naming decision --->
+# Stream (Timeseries)
 
-Handles everything needed to bypass the latency limitations of records, and enables the ability to implement watch mechanisms.
+Handles real-time data like ticker prices, quotes, and other timeseries data. Uses Redis TimeSeries for storage.
+
+from `./pkg/storage/stream.go`
+```go
+type StreamEntry struct {
+	Key       string
+	Value     float64
+	Timestamp time.Time
+}
+
+type StreamStorage interface {
+	Add(ctx context.Context, key string, value float64) error
+	AddAt(ctx context.Context, key string, ts time.Time, value float64) error
+	Latest(ctx context.Context, key string) (*StreamEntry, error)
+	Range(ctx context.Context, key string, from, to time.Time) ([]*StreamEntry, error)
+	Watch(ctx context.Context, prefix string) (<-chan WatchEvent, error)
+	Close() error
+}
+```
+
+**Use cases:** Ticker prices, continuous quota updates, any data that changes frequently and needs historical access.
+
+# Event (Message Queue)
+
+Handles event-driven messaging. Append-only log of events that can be consumed by subscribers. Uses Redis Streams.
+
+from `./pkg/storage/event.go`
+```go
+type Event struct {
+	ID    string // Redis stream ID e.g., "1234567890123-0"
+	Topic string
+	Data  string // JSON blob
+}
+
+type EventStorage interface {
+	Publish(ctx context.Context, topic string, data string) (eventID string, err error)
+	Subscribe(ctx context.Context, topic string) (<-chan Event, error)
+	SubscribeFrom(ctx context.Context, topic string, fromID string) (<-chan Event, error)
+	Close() error
+}
+```
+
+**Use cases:** Entity change notifications, order events, system events.
+
+# Infrastructure
+
+```bash
+# Start Redis Stack (includes TimeSeries)
+docker-compose up -d
+```
