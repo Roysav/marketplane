@@ -162,6 +162,7 @@ type RowStorage interface {
 - [ ] Allocation (cross-tradespace funds)
 - [ ] CLI
 - [ ] PostgreSQL
+- [ ] Intensive Validation
 
 ## Commands
 ```bash
