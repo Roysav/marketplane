@@ -6,19 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
+	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/roysav/marketplane/pkg/entity"
 	"github.com/roysav/marketplane/pkg/storage"
 )
 
 var (
-	ErrUnknownType      = errors.New("unknown entity type")
-	ErrMissingField     = errors.New("missing required field")
-	ErrInvalidType      = errors.New("invalid field type")
-	ErrInvalidEnumValue = errors.New("invalid enum value")
+	ErrUnknownType = errors.New("unknown entity type")
+	ErrValidation  = errors.New("validation failed")
 )
 
-// coreSchemas holds schemas for built-in types.
+// coreSchemas holds JSON Schema definitions for built-in types.
 var coreSchemas = map[string]map[string]any{
 	"core/v1/EntityDefinition": {
 		"type":     "object",
@@ -50,6 +51,20 @@ var coreSchemas = map[string]map[string]any{
 	},
 }
 
+// compiledCoreSchemas holds pre-compiled schemas for core types.
+var compiledCoreSchemas map[string]*gojsonschema.Schema
+
+func init() {
+	compiledCoreSchemas = make(map[string]*gojsonschema.Schema)
+	for typeStr, schemaData := range coreSchemas {
+		schema, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(schemaData))
+		if err != nil {
+			panic(fmt.Sprintf("failed to compile core schema %s: %v", typeStr, err))
+		}
+		compiledCoreSchemas[typeStr] = schema
+	}
+}
+
 // Validator validates entities against their schemas.
 type Validator struct {
 	storage storage.RecordStorage
@@ -65,8 +80,8 @@ func (v *Validator) Validate(ctx context.Context, e *entity.Entity) error {
 	typeStr := e.TypeMeta.GVK().Type()
 
 	// Check core types first
-	if schema, ok := coreSchemas[typeStr]; ok {
-		return validateSpec(e.Spec, schema)
+	if schema, ok := compiledCoreSchemas[typeStr]; ok {
+		return validateWithSchema(schema, e.Spec)
 	}
 
 	// Look up EntityDefinition from storage
@@ -85,12 +100,17 @@ func (v *Validator) Validate(ctx context.Context, e *entity.Entity) error {
 		return fmt.Errorf("invalid EntityDefinition data: %w", err)
 	}
 
-	schema, _ := data["schema"].(map[string]any)
-	if schema == nil {
-		return nil
+	schemaData, ok := data["schema"].(map[string]any)
+	if !ok || schemaData == nil {
+		return nil // No schema defined, allow anything
 	}
 
-	return validateSpec(e.Spec, schema)
+	schema, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(schemaData))
+	if err != nil {
+		return fmt.Errorf("invalid schema for %s: %w", typeStr, err)
+	}
+
+	return validateWithSchema(schema, e.Spec)
 }
 
 // IsCoreType returns true if the type string is a built-in core type.
@@ -104,69 +124,18 @@ func definitionName(gvk entity.GroupVersionKind) string {
 	return fmt.Sprintf("%s.%s", gvk.Kind, gvk.Group)
 }
 
-func validateSpec(spec map[string]any, schema map[string]any) error {
-	if required, ok := schema["required"].([]any); ok {
-		for _, r := range required {
-			field := r.(string)
-			if _, exists := spec[field]; !exists {
-				return fmt.Errorf("%w: %s", ErrMissingField, field)
-			}
-		}
+func validateWithSchema(schema *gojsonschema.Schema, spec map[string]any) error {
+	result, err := schema.Validate(gojsonschema.NewGoLoader(spec))
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 
-	properties, _ := schema["properties"].(map[string]any)
-	for field, value := range spec {
-		propSchema, ok := properties[field].(map[string]any)
-		if !ok {
-			continue
+	if !result.Valid() {
+		var msgs []string
+		for _, e := range result.Errors() {
+			msgs = append(msgs, e.String())
 		}
-		if err := validateType(field, value, propSchema); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func validateType(field string, value any, schema map[string]any) error {
-	expectedType, _ := schema["type"].(string)
-
-	switch expectedType {
-	case "string":
-		strVal, ok := value.(string)
-		if !ok {
-			return fmt.Errorf("%w: field %s expected string, got %T", ErrInvalidType, field, value)
-		}
-		if enum, ok := schema["enum"].([]any); ok {
-			valid := false
-			for _, e := range enum {
-				if e.(string) == strVal {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				return fmt.Errorf("%w: field %s value %q", ErrInvalidEnumValue, field, strVal)
-			}
-		}
-	case "object":
-		if _, ok := value.(map[string]any); !ok {
-			return fmt.Errorf("%w: field %s expected object, got %T", ErrInvalidType, field, value)
-		}
-	case "array":
-		if _, ok := value.([]any); !ok {
-			return fmt.Errorf("%w: field %s expected array, got %T", ErrInvalidType, field, value)
-		}
-	case "number":
-		switch value.(type) {
-		case float64, int, int64:
-		default:
-			return fmt.Errorf("%w: field %s expected number, got %T", ErrInvalidType, field, value)
-		}
-	case "boolean":
-		if _, ok := value.(bool); !ok {
-			return fmt.Errorf("%w: field %s expected boolean, got %T", ErrInvalidType, field, value)
-		}
+		return fmt.Errorf("%w: %s", ErrValidation, strings.Join(msgs, "; "))
 	}
 
 	return nil
