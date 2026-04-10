@@ -366,3 +366,240 @@ func TestAllocationController_FullFlow(t *testing.T) {
 		t.Errorf("expected 3 ledger entries, got %d", len(listResp.Entries))
 	}
 }
+
+func TestAllocationController_InitialSync(t *testing.T) {
+	records, ledger, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create allocations BEFORE starting the controller
+	allocations := []struct {
+		name   string
+		amount string
+	}{
+		{"pre-deposit-001", "500.00"},
+		{"pre-deposit-002", "300.00"},
+	}
+
+	for _, a := range allocations {
+		spec, _ := structpb.NewStruct(map[string]any{
+			"currency":   "USD",
+			"amount":     a.amount,
+			"targetType": "core/v1/Deposit",
+			"targetName": a.name,
+		})
+		_, err := records.Create(ctx, &pb.CreateRequest{
+			Record: &pb.Record{
+				TypeMeta: &pb.TypeMeta{
+					Group:   "core",
+					Version: "v1",
+					Kind:    "Allocation",
+				},
+				ObjectMeta: &pb.ObjectMeta{
+					Name:       a.name,
+					Tradespace: "test-ns",
+				},
+				Spec: spec,
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create allocation %s: %v", a.name, err)
+		}
+	}
+
+	// Verify allocations are pending (no status)
+	for _, a := range allocations {
+		getResp, _ := records.Get(ctx, &pb.GetRequest{
+			Type:       "core/v1/Allocation",
+			Tradespace: "test-ns",
+			Name:       a.name,
+		})
+		if getResp.Record.Status != nil && len(getResp.Record.Status.Fields) > 0 {
+			t.Fatalf("allocation %s should be pending before controller starts", a.name)
+		}
+	}
+
+	// NOW start the controller - it should pick up pending allocations on initial sync
+	ctrl := NewAllocationController(records, ledger, nil)
+	ctrlCtx, ctrlCancel := context.WithCancel(ctx)
+	defer ctrlCancel()
+
+	go ctrl.Run(ctrlCtx)
+
+	// Wait for initial sync to process
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify all allocations are now approved
+	for _, a := range allocations {
+		getResp, err := records.Get(ctx, &pb.GetRequest{
+			Type:       "core/v1/Allocation",
+			Tradespace: "test-ns",
+			Name:       a.name,
+		})
+		if err != nil {
+			t.Fatalf("failed to get allocation %s: %v", a.name, err)
+		}
+
+		if getResp.Record.Status == nil {
+			t.Fatalf("allocation %s should have status after initial sync", a.name)
+		}
+
+		phase := getResp.Record.Status.Fields["phase"].GetStringValue()
+		if phase != PhaseApproved {
+			t.Errorf("allocation %s: expected phase %s, got %s", a.name, PhaseApproved, phase)
+		}
+	}
+
+	// Verify ledger has both entries
+	listResp, _ := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	if len(listResp.Entries) != 2 {
+		t.Errorf("expected 2 ledger entries, got %d", len(listResp.Entries))
+	}
+}
+
+func TestAllocationController_PeriodicResync(t *testing.T) {
+	records, ledger, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Start controller with short sync interval
+	ctrl := NewAllocationController(records, ledger, nil)
+	ctrl.SetSyncInterval(200 * time.Millisecond) // Short interval for testing
+
+	ctrlCtx, ctrlCancel := context.WithCancel(ctx)
+	defer ctrlCancel()
+
+	go ctrl.Run(ctrlCtx)
+	time.Sleep(100 * time.Millisecond)
+
+	// Create an allocation - this will be processed via watch
+	spec, _ := structpb.NewStruct(map[string]any{
+		"currency":   "USD",
+		"amount":     "1000.00",
+		"targetType": "core/v1/Deposit",
+		"targetName": "deposit-001",
+	})
+	_, err := records.Create(ctx, &pb.CreateRequest{
+		Record: &pb.Record{
+			TypeMeta: &pb.TypeMeta{
+				Group:   "core",
+				Version: "v1",
+				Kind:    "Allocation",
+			},
+			ObjectMeta: &pb.ObjectMeta{
+				Name:       "sync-deposit",
+				Tradespace: "test-ns",
+			},
+			Spec: spec,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create allocation: %v", err)
+	}
+
+	// Wait for processing (either via watch or resync)
+	var finalRecord *pb.Record
+	for i := 0; i < 30; i++ {
+		time.Sleep(100 * time.Millisecond)
+
+		getResp, _ := records.Get(ctx, &pb.GetRequest{
+			Type:       "core/v1/Allocation",
+			Tradespace: "test-ns",
+			Name:       "sync-deposit",
+		})
+
+		if getResp.Record.Status != nil {
+			if phase, ok := getResp.Record.Status.Fields["phase"]; ok {
+				if phase.GetStringValue() != "" {
+					finalRecord = getResp.Record
+					break
+				}
+			}
+		}
+	}
+
+	if finalRecord == nil {
+		t.Fatal("allocation was not processed")
+	}
+
+	phase := finalRecord.Status.Fields["phase"].GetStringValue()
+	if phase != PhaseApproved {
+		t.Errorf("expected phase %s, got %s", PhaseApproved, phase)
+	}
+}
+
+func TestAllocationController_SyncMultipleTradespaces(t *testing.T) {
+	records, ledger, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Create allocations in different tradespaces BEFORE controller starts
+	tradespaces := []string{"ns-alpha", "ns-beta", "ns-gamma"}
+
+	for _, ts := range tradespaces {
+		spec, _ := structpb.NewStruct(map[string]any{
+			"currency":   "USD",
+			"amount":     "100.00",
+			"targetType": "core/v1/Deposit",
+			"targetName": "deposit-" + ts,
+		})
+		_, err := records.Create(ctx, &pb.CreateRequest{
+			Record: &pb.Record{
+				TypeMeta: &pb.TypeMeta{
+					Group:   "core",
+					Version: "v1",
+					Kind:    "Allocation",
+				},
+				ObjectMeta: &pb.ObjectMeta{
+					Name:       "alloc-" + ts,
+					Tradespace: ts,
+				},
+				Spec: spec,
+			},
+		})
+		if err != nil {
+			t.Fatalf("failed to create allocation in %s: %v", ts, err)
+		}
+	}
+
+	// Start controller
+	ctrl := NewAllocationController(records, ledger, nil)
+	ctrlCtx, ctrlCancel := context.WithCancel(ctx)
+	defer ctrlCancel()
+
+	go ctrl.Run(ctrlCtx)
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify all allocations across all tradespaces are processed
+	for _, ts := range tradespaces {
+		getResp, err := records.Get(ctx, &pb.GetRequest{
+			Type:       "core/v1/Allocation",
+			Tradespace: ts,
+			Name:       "alloc-" + ts,
+		})
+		if err != nil {
+			t.Fatalf("failed to get allocation in %s: %v", ts, err)
+		}
+
+		if getResp.Record.Status == nil {
+			t.Fatalf("allocation in %s should have status", ts)
+		}
+
+		phase := getResp.Record.Status.Fields["phase"].GetStringValue()
+		if phase != PhaseApproved {
+			t.Errorf("allocation in %s: expected phase %s, got %s", ts, PhaseApproved, phase)
+		}
+
+		// Verify ledger entry exists in each tradespace
+		listResp, _ := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: ts})
+		if len(listResp.Entries) != 1 {
+			t.Errorf("tradespace %s: expected 1 ledger entry, got %d", ts, len(listResp.Entries))
+		}
+	}
+}

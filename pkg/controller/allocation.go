@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,14 +22,18 @@ const (
 	PhasePending  = "Pending"
 	PhaseApproved = "Approved"
 	PhaseRejected = "Rejected"
+
+	// Default sync interval
+	DefaultSyncInterval = 30 * time.Second
 )
 
 // AllocationController reconciles Allocation records by appending to the ledger.
 // It runs as a separate process and communicates with the API server via gRPC.
 type AllocationController struct {
-	records pb.RecordServiceClient
-	ledger  pb.LedgerServiceClient
-	logger  *slog.Logger
+	records      pb.RecordServiceClient
+	ledger       pb.LedgerServiceClient
+	logger       *slog.Logger
+	syncInterval time.Duration
 }
 
 // NewAllocationController creates a new AllocationController.
@@ -37,14 +42,29 @@ func NewAllocationController(records pb.RecordServiceClient, ledger pb.LedgerSer
 		logger = slog.Default()
 	}
 	return &AllocationController{
-		records: records,
-		ledger:  ledger,
-		logger:  logger.With("component", "allocation-controller"),
+		records:      records,
+		ledger:       ledger,
+		logger:       logger.With("component", "allocation-controller"),
+		syncInterval: DefaultSyncInterval,
 	}
 }
 
+// SetSyncInterval sets the interval for periodic resync.
+func (c *AllocationController) SetSyncInterval(d time.Duration) {
+	c.syncInterval = d
+}
+
 // Run starts the controller loop, watching for Allocation events.
+// It performs an initial sync, then watches for new events while periodically resyncing.
 func (c *AllocationController) Run(ctx context.Context) error {
+	c.logger.Info("allocation controller started")
+
+	// Initial sync - process all pending allocations
+	if err := c.sync(ctx); err != nil {
+		c.logger.Error("initial sync failed", "error", err)
+	}
+
+	// Start watch stream
 	stream, err := c.records.Watch(ctx, &pb.WatchRequest{
 		Type: AllocationTypeStr,
 	})
@@ -52,35 +72,103 @@ func (c *AllocationController) Run(ctx context.Context) error {
 		return err
 	}
 
-	c.logger.Info("allocation controller started")
+	// Periodic resync ticker
+	ticker := time.NewTicker(c.syncInterval)
+	defer ticker.Stop()
+
+	// Channel for watch events
+	eventCh := make(chan *pb.WatchEvent)
+	errCh := make(chan error, 1)
+
+	// Watch goroutine
+	go func() {
+		for {
+			event, err := stream.Recv()
+			if err != nil {
+				errCh <- err
+				return
+			}
+			select {
+			case eventCh <- event:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	for {
-		event, err := stream.Recv()
-		if err != nil {
+		select {
+		case <-ctx.Done():
+			c.logger.Info("allocation controller stopped")
+			return nil
+
+		case err := <-errCh:
 			if errors.Is(err, io.EOF) || errors.Is(err, context.Canceled) {
 				c.logger.Info("allocation controller stopped")
 				return nil
 			}
 			return err
+
+		case <-ticker.C:
+			c.logger.Debug("periodic resync")
+			if err := c.sync(ctx); err != nil {
+				c.logger.Error("periodic sync failed", "error", err)
+			}
+
+		case event := <-eventCh:
+			if event.Action != "created" {
+				continue
+			}
+			if event.Record == nil {
+				continue
+			}
+			if err := c.reconcile(ctx, event.Record); err != nil {
+				c.logger.Error("failed to reconcile allocation",
+					"tradespace", event.Record.ObjectMeta.GetTradespace(),
+					"name", event.Record.ObjectMeta.GetName(),
+					"error", err,
+				)
+			}
+		}
+	}
+}
+
+// sync lists all allocations and processes any pending ones.
+func (c *AllocationController) sync(ctx context.Context) error {
+	resp, err := c.records.List(ctx, &pb.ListRequest{
+		Type: AllocationTypeStr,
+	})
+	if err != nil {
+		return err
+	}
+
+	pending := 0
+	for _, rec := range resp.Records {
+		// Check if pending (no phase set)
+		if rec.Status != nil {
+			if phase, ok := rec.Status.Fields["phase"]; ok {
+				phaseStr := phase.GetStringValue()
+				if phaseStr == PhaseApproved || phaseStr == PhaseRejected {
+					continue
+				}
+			}
 		}
 
-		// Only process create events
-		if event.Action != "created" {
-			continue
-		}
-
-		if event.Record == nil {
-			continue
-		}
-
-		if err := c.reconcile(ctx, event.Record); err != nil {
-			c.logger.Error("failed to reconcile allocation",
-				"tradespace", event.Record.ObjectMeta.GetTradespace(),
-				"name", event.Record.ObjectMeta.GetName(),
+		pending++
+		if err := c.reconcile(ctx, rec); err != nil {
+			c.logger.Error("failed to reconcile allocation during sync",
+				"tradespace", rec.ObjectMeta.GetTradespace(),
+				"name", rec.ObjectMeta.GetName(),
 				"error", err,
 			)
 		}
 	}
+
+	if pending > 0 {
+		c.logger.Info("sync completed", "pending_processed", pending)
+	}
+
+	return nil
 }
 
 func (c *AllocationController) reconcile(ctx context.Context, rec *pb.Record) error {
