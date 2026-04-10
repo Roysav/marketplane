@@ -49,6 +49,13 @@ func main() {
 	}
 	defer rows.Close()
 
+	ledger, err := sqlite.NewLedgerStorage(ctx, *dbPath)
+	if err != nil {
+		logger.Error("failed to initialize ledger storage", "error", err)
+		os.Exit(1)
+	}
+	defer ledger.Close()
+
 	// Redis is optional - continue without streams/events if unavailable
 	var events *redis.EventStorage
 	var streams *redis.StreamStorage
@@ -81,6 +88,9 @@ func main() {
 
 	streamSrv := server.NewStreamServer(streamSvc, logger)
 	streamSrv.Register(grpcServer)
+
+	ledgerSrv := server.NewLedgerServer(ledger, logger)
+	ledgerSrv.Register(grpcServer)
 
 	// Enable reflection for grpcurl/grpcui
 	reflection.Register(grpcServer)

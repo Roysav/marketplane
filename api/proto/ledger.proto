@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package marketplane.v1;
+
+option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1";
+
+import "google/protobuf/timestamp.proto";
+
+// LedgerService manages the append-only ledger of allocations.
+service LedgerService {
+  // Append atomically checks balance and inserts a ledger entry.
+  // Returns FAILED_PRECONDITION if insufficient balance.
+  // Returns ALREADY_EXISTS if target already has an allocation.
+  rpc Append(LedgerAppendRequest) returns (LedgerAppendResponse);
+
+  // List returns all ledger entries for a tradespace.
+  rpc List(LedgerListRequest) returns (LedgerListResponse);
+}
+
+// LedgerEntry represents a single entry in the ledger.
+message LedgerEntry {
+  string id = 1;
+  string tradespace = 2;
+  string currency = 3;
+  string amount = 4;              // decimal string, can be negative
+  string allocation_name = 5;     // references the Allocation record
+  string target_type = 6;         // type of target record (e.g., "polymarket/v1/Order")
+  string target_name = 7;         // name of target record
+  google.protobuf.Timestamp created_at = 8;
+}
+
+// LedgerAppendRequest is the request for Append.
+message LedgerAppendRequest {
+  string tradespace = 1;
+  string currency = 2;
+  string amount = 3;
+  string allocation_name = 4;
+  string target_type = 5;
+  string target_name = 6;
+}
+
+// LedgerAppendResponse is the response for Append.
+message LedgerAppendResponse {
+  LedgerEntry entry = 1;
+}
+
+// LedgerListRequest is the request for List.
+message LedgerListRequest {
+  string tradespace = 1;
+}
+
+// LedgerListResponse is the response for List.
+message LedgerListResponse {
+  repeated LedgerEntry entries = 1;
+}

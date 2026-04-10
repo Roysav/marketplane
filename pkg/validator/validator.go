@@ -69,6 +69,16 @@ var coreSchemas = map[string]map[string]any{
 			},
 		},
 	},
+	"core/v1/Allocation": {
+		"type":     "object",
+		"required": []any{"currency", "amount", "targetType", "targetName"},
+		"properties": map[string]any{
+			"currency":   map[string]any{"type": "string"},
+			"amount":     map[string]any{"type": "string"}, // decimal string, negative for spending
+			"targetType": map[string]any{"type": "string"}, // e.g., "polymarket/v1/Order"
+			"targetName": map[string]any{"type": "string"}, // name of the target record
+		},
+	},
 }
 
 // coreScopes defines the scope for built-in types.
@@ -77,6 +87,7 @@ var coreScopes = map[string]Scope{
 	"core/v1/StreamDefinition": ScopeGlobal,     // Stream definitions are global
 	"core/v1/Tradespace":       ScopeGlobal,     // Tradespaces themselves are global
 	"core/v1/Quota":            ScopeTradespace, // Quotas are per-tradespace
+	"core/v1/Allocation":       ScopeTradespace, // Allocations are per-tradespace
 }
 
 // compiledCoreSchemas holds pre-compiled schemas for core types.
