@@ -155,14 +155,16 @@ type RowStorage interface {
 
 
 ## Not Implemented Yet
-- [ ] gRPC API Server
+- [x] gRPC API Server
 - [x] Redis (Stream storage, watches) ✓
 - [x] Service layer ✓
 - [ ] RBAC
-- [ ] Allocation (cross-tradespace funds)
+- [x] Allocation (cross-tradespace funds)
 - [ ] CLI
-- [ ] PostgreSQL
+- [x] PostgreSQL
 - [ ] Intensive Validation
+- [ ] Polymarket Controller - Both market data: realtime crypto, token prices / books, User data: trades. 
+- [ ] MarketMaking Controller - Provide conversion from market-maker object (provided fair price, spread, and strategies), and converts it to orders, (not a specific order type but a user defined, so it is generic and works for all venues)
 
 ## Commands
 ```bash
