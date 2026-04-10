@@ -8,15 +8,18 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
+	"github.com/roysav/marketplane/pkg/storage"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
+	"github.com/roysav/marketplane/pkg/storage/sqlite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/roysav/marketplane/pkg/server"
 	"github.com/roysav/marketplane/pkg/service"
 	"github.com/roysav/marketplane/pkg/storage/redis"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
 
 func main() {
@@ -42,16 +45,25 @@ func main() {
 	// Initialize storage
 	logger.Info("initializing storage", "db", *dbPath, "redis", *redisAddr)
 
-	rows, err := sqlite.New(ctx, *dbPath)
-	if err != nil {
-		logger.Error("failed to initialize SQLite", "error", err)
+	var rows storage.RowStorage
+	var ledger storage.LedgerStorage
+	var rowsErr, ledgerErr error
+
+	if strings.HasPrefix(*dbPath, "postgres://") {
+		rows, rowsErr = postgres.New(ctx, *dbPath)
+		ledger, ledgerErr = postgres.NewLedgerStorage(ctx, *dbPath)
+	} else {
+		ledger, ledgerErr = sqlite.NewLedgerStorage(ctx, *dbPath)
+	}
+
+	if rowsErr != nil {
+		logger.Error("failed to initialize row storage", "error", rowsErr)
 		os.Exit(1)
 	}
 	defer rows.Close()
 
-	ledger, err := sqlite.NewLedgerStorage(ctx, *dbPath)
-	if err != nil {
-		logger.Error("failed to initialize ledger storage", "error", err)
+	if ledgerErr != nil {
+		logger.Error("failed to initialize ledger storage", "error", ledgerErr)
 		os.Exit(1)
 	}
 	defer ledger.Close()
