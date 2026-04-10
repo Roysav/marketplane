@@ -2,8 +2,6 @@
 
 ## Project: Marketplane
 
-**A Kubernetes-inspired control plane for trading systems.**
-
 Module: `github.com/roysav/marketplane`
 
 ## Architecture
@@ -52,7 +50,7 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 | `core/v1/Quota` | Balance limits per Tradespace |
 
 ### Tradespace
-- Isolation boundary for records (like K8s namespace)
+- Isolation boundary for records 
 - Global records use `"default"` tradespace
 
 ### MetaRecord

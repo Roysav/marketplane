@@ -2,7 +2,7 @@
 
 ## Project: Marketplane
 
-**A Kubernetes-inspired control plane for trading systems.**
+**A control plane for trading systems.**
 
 Module: `github.com/roysav/marketplane`
 
