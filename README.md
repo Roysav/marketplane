@@ -6,9 +6,9 @@ Define custom entity types declaratively, persist them, and watch for real-time 
 
 ## Features
 
-- **Extensible Entity System** - Define custom types via EntityDefinition (like K8s CRDs)
-- **Dual Storage Model** - Record (persistent) and Stream (real-time) storage
-- **Tradespace Isolation** - Namespace-like boundaries for resources
+- **Extensible Entity System** - Define custom types via EntityDefinition.
+- **Dual Storage Model** - Record (persistent) and Stream (real-time) storage.
+- **Tradespace Isolation** - boundaries for resources
 - **Schema Validation** - JSON Schema validation for entity specs
 
 ## Quick Start
