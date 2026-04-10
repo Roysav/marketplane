@@ -153,13 +153,13 @@ type RowStorage interface {
 
 
 ## Not Implemented Yet
-- [ ] gRPC API Server
+- [x] gRPC API Server
 - [x] Redis (Stream storage, watches) ✓
 - [x] Service layer ✓
 - [ ] RBAC
-- [ ] Allocation (cross-tradespace funds)
+- [x] Allocation (cross-tradespace funds)
 - [ ] CLI
-- [ ] PostgreSQL
+- [x] PostgreSQL
 - [ ] Intensive Validation
 
 ## Commands
