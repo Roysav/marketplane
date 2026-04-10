@@ -166,6 +166,9 @@ type RowStorage interface {
 - [ ] Polymarket Controller - Both market data: realtime crypto, token prices / books, User data: trades. 
 - [ ] MarketMaking Controller - Provide conversion from market-maker object (provided fair price, spread, and strategies), and converts it to orders, (not a specific order type but a user defined, so it is generic and works for all venues)
 
+## Bugs:
+- [ ] The ledger controller should retry failed allocations, not just skip them.
+
 ## Commands
 ```bash
 go test ./... -v      # Run tests
