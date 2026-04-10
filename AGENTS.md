@@ -175,3 +175,14 @@ docker-compose up -d  # Start Redis Stack
 - Redis Stack (Streams for timeseries and events)
 - gojsonschema (JSON Schema validation)
 - Future: PostgreSQL, gRPC, buf
+
+## Target
+The final results we aim at, is not just declarative "Order" instances, but rather a larger "Strategy" Objects, that describe Intent, after an agent (perhaps some modeling tool) creates this kind of intent, Controllers will translate that into what orders to create/cancel sending. So the path will look like this:
+
+```
+Model -> creates intent.
+StrategyController -> Translates that intent into orders, via a reconcilliation loop.
+OrderControllers   -> Creates an Allocation Object for each of those orders (for create orders)
+LedgerController   -> Approves(or rejects) via an appened only log. 
+```
+Of course each is async, it's nonblocking, the model doesn't need an immediate response from the trail.
