@@ -70,9 +70,9 @@ pkg/
 - [x] RecordStorage interface
 - [x] SQLite implementation
 - [x] Schema validation
-- [ ] gRPC API Server
-- [ ] Redis (Stream storage, watches)
-- [ ] PostgreSQL implementation
+- [x] gRPC API Server
+- [x] Redis (Stream storage, watches)
+- [x] PostgreSQL implementation
 - [ ] CLI tool
 
 ## License
