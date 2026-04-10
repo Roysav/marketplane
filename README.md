@@ -1,6 +1,6 @@
 # Marketplane
 
-**A Kubernetes-inspired control plane for trading systems.**
+**A control plane for enabling declarative algotrading.**
 
 Define custom entity types declaratively, persist them, and watch for real-time changes. Built for trading across crypto, prediction markets, and traditional finance.
 
