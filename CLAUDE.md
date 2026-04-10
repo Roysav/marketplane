@@ -178,4 +178,6 @@ docker-compose up -d  # Start Redis Stack
 - SQLite (modernc.org/sqlite - pure Go)
 - Redis Stack (Streams for timeseries and events)
 - gojsonschema (JSON Schema validation)
-- Future: PostgreSQL, gRPC, buf
+- postgres
+- grpc
+- buf
