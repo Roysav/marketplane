@@ -7,7 +7,7 @@
 //   - The Common Name (CN) of the verified client certificate becomes the
 //     caller's identity and is injected into the request context.
 //   - A core/v1/User record with a matching commonName can carry additional
-//     metadata (roles, description) for future authorisation use.
+//     metadata (description) for the authenticated user.
 package auth
 
 import (
