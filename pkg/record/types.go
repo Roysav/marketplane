@@ -75,7 +75,9 @@ type ObjectMeta struct {
 	Finalizers        []string          `json:"finalizers,omitempty"`
 }
 
-// IsTerminating returns true if deletion has been requested but finalizers are still pending.
+// IsTerminating returns true when a deletion has been requested (DeletionTimestamp is set).
+// The record may still have finalizers pending, or final deletion may be delegated to another
+// process; either way the object is considered terminating until it is removed from storage.
 func (m *ObjectMeta) IsTerminating() bool {
 	return m.DeletionTimestamp != nil
 }
