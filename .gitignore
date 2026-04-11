@@ -40,3 +40,4 @@ config.local.yaml
 
 # Build
 dist/
+/server
