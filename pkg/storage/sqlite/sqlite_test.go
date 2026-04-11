@@ -3,6 +3,7 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -432,7 +433,10 @@ func TestUpdate_FinalizersWithConflict(t *testing.T) {
 	staleCopy.Finalizers = nil
 	_, err = s.Update(ctx, &staleCopy)
 	if err == nil {
-		t.Error("expected conflict error on stale ResourceVersion, got nil")
+		t.Fatal("expected conflict error on stale ResourceVersion, got nil")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "conflict") {
+		t.Fatalf("expected conflict error on stale ResourceVersion, got: %v", err)
 	}
 }
 
