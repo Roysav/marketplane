@@ -64,15 +64,22 @@ func splitType(s string) []string {
 
 // ObjectMeta contains metadata about a record.
 type ObjectMeta struct {
-	Name            string            `json:"name"`
-	Tradespace      string            `json:"tradespace,omitempty"`
-	UID             string            `json:"uid,omitempty"`
-	ResourceVersion int64             `json:"resourceVersion,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	Annotations     map[string]string `json:"annotations,omitempty"`
-	CreatedAt       time.Time         `json:"createdAt,omitempty"`
-	UpdatedAt       time.Time         `json:"updatedAt,omitempty"`
-	DeletedAt       *time.Time        `json:"deletedAt,omitempty"`
+	Name              string            `json:"name"`
+	Tradespace        string            `json:"tradespace,omitempty"`
+	ResourceVersion   int64             `json:"resourceVersion,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	Annotations       map[string]string `json:"annotations,omitempty"`
+	CreatedAt         time.Time         `json:"createdAt,omitempty"`
+	UpdatedAt         time.Time         `json:"updatedAt,omitempty"`
+	DeletionTimestamp *time.Time        `json:"deletionTimestamp,omitempty"`
+	Finalizers        []string          `json:"finalizers,omitempty"`
+}
+
+// IsTerminating returns true when a deletion has been requested (DeletionTimestamp is set).
+// The record may still have finalizers pending, or final deletion may be delegated to another
+// process; either way the object is considered terminating until it is removed from storage.
+func (m *ObjectMeta) IsTerminating() bool {
+	return m.DeletionTimestamp != nil
 }
 
 // Record is the generic wrapper for all resources.
