@@ -110,7 +110,10 @@ func signedLeaf(t *testing.T, ca *certBundle, cn string, dnsNames []string, isSe
 		t.Fatalf("create leaf cert: %v", err)
 	}
 
-	cert, _ := x509.ParseCertificate(certDER)
+	cert, err := x509.ParseCertificate(certDER)
+	if err != nil {
+		t.Fatalf("parse leaf cert: %v", err)
+	}
 	certPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
 	keyDER, err := x509.MarshalECPrivateKey(key)
