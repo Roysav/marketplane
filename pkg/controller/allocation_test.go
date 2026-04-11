@@ -13,24 +13,28 @@ import (
 	pb "github.com/roysav/marketplane/api/gen"
 	"github.com/roysav/marketplane/pkg/server"
 	"github.com/roysav/marketplane/pkg/service"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/redis"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
+
+const testDSN = "postgres://marketplane:marketplane@localhost:5432/marketplane?sslmode=disable"
 
 func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClient, func()) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Create in-memory storage
-	rows, err := sqlite.New(ctx, ":memory:")
+	// Create storage
+	rows, err := postgres.New(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create row storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
 
-	ledger, err := sqlite.NewLedgerStorage(ctx, ":memory:")
+	ledger, err := postgres.NewLedgerStorage(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create ledger storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	ledger.DB().ExecContext(ctx, "TRUNCATE ledger CASCADE")
 
 	// Connect to Redis for events (required for Watch)
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})

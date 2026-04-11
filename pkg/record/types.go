@@ -94,7 +94,7 @@ type Record struct {
 type StorageType string
 
 const (
-	StorageRow    StorageType = "record" // PostgreSQL/SQLite
+	StorageRow    StorageType = "record" // PostgreSQL
 	StorageStream StorageType = "stream" // Redis
 )
 

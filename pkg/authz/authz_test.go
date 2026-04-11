@@ -15,16 +15,20 @@ import (
 	"github.com/roysav/marketplane/pkg/auth"
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 )
+
+const testDSN = "postgres://marketplane:marketplane@localhost:5432/marketplane?sslmode=disable"
 
 func newTestAuthorizer(t *testing.T, bootstrap ...string) (*Authorizer, storage.RowStorage) {
 	t.Helper()
+	ctx := context.Background()
 
-	rows, err := sqlite.New(context.Background(), ":memory:")
+	rows, err := postgres.New(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create row storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
 	t.Cleanup(func() { rows.Close() })
 
 	return New(Config{

@@ -8,17 +8,20 @@ import (
 	"testing"
 
 	"github.com/roysav/marketplane/pkg/record"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 )
+
+const testDSN = "postgres://marketplane:marketplane@localhost:5432/marketplane?sslmode=disable"
 
 func newTestService(t *testing.T) *Service {
 	t.Helper()
 	ctx := context.Background()
 
-	rows, err := sqlite.New(ctx, ":memory:")
+	rows, err := postgres.New(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
 	t.Cleanup(func() { rows.Close() })
 
 	// Use a discarding logger for tests

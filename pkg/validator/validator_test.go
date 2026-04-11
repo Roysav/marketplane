@@ -7,15 +7,20 @@ import (
 
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 )
 
-func newTestValidator(t *testing.T) (*Validator, *sqlite.Storage) {
+const testDSN = "postgres://marketplane:marketplane@localhost:5432/marketplane?sslmode=disable"
+
+func newTestValidator(t *testing.T) (*Validator, storage.RowStorage) {
 	t.Helper()
-	s, err := sqlite.New(context.Background(), ":memory:")
+	ctx := context.Background()
+
+	s, err := postgres.New(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	s.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
 	t.Cleanup(func() { s.Close() })
 	return New(s), s
 }
