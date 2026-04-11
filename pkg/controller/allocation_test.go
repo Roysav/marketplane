@@ -28,7 +28,10 @@ func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClie
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	rows.DB().ExecContext(ctx, "DELETE FROM records WHERE type = 'core/v1/Allocation'")
+	_, err = rows.DB().ExecContext(ctx, "DELETE FROM records WHERE type = 'core/v1/Allocation'")
+	if err != nil {
+		t.Fatalf("failed to clean up allocation records: %v", err)
+	}
 
 	ledger, err := postgres.NewLedgerStorage(ctx, testDSN)
 	if err != nil {

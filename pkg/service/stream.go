@@ -143,7 +143,11 @@ func (s *StreamService) Watch(ctx context.Context, key StreamKey) (<-chan storag
 // design (schema changes require creating a new version), so this is safe.
 func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*StreamDefinitionSpec, error) {
 	if v, ok := s.defCache.Load(key.Name); ok {
-		return v.(*StreamDefinitionSpec), nil
+		if spec, ok := v.(*StreamDefinitionSpec); ok {
+			return spec, nil
+		}
+		// Unexpected type in cache — evict and re-fetch from DB.
+		s.defCache.Delete(key.Name)
 	}
 
 	// StreamDefinition is stored with name as the identifier
