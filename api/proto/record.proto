@@ -44,6 +44,8 @@ message ObjectMeta {
   int64 resource_version = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  repeated string finalizers = 8;
+  google.protobuf.Timestamp deletion_timestamp = 9;  // null if not terminating
 }
 
 // Record is the generic wrapper for all resources.

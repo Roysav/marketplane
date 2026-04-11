@@ -46,15 +46,19 @@ func (s *RowStorage) Create(ctx context.Context, r *storage.Row) (*storage.Row, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal labels: %w", err)
 	}
+	finalizers, err := json.Marshal(r.Finalizers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal finalizers: %w", err)
+	}
 
 	var createdAt, updatedAt time.Time
 	var resourceVersion int64
 
 	err = s.db.QueryRowContext(ctx, `
-		INSERT INTO records (type, tradespace, name, labels, data)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO records (type, tradespace, name, labels, data, finalizers)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING resource_version, created_at, updated_at
-	`, r.Type, r.Tradespace, r.Name, labels, r.Data).Scan(&resourceVersion, &createdAt, &updatedAt)
+	`, r.Type, r.Tradespace, r.Name, labels, r.Data, finalizers).Scan(&resourceVersion, &createdAt, &updatedAt)
 
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -72,21 +76,22 @@ func (s *RowStorage) Create(ctx context.Context, r *storage.Row) (*storage.Row, 
 		ResourceVersion: resourceVersion,
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
+		Finalizers:      r.Finalizers,
 	}, nil
 }
 
 // Get retrieves a row by key.
 func (s *RowStorage) Get(ctx context.Context, key storage.Key) (*storage.Row, error) {
-	var labelsJSON []byte
+	var labelsJSON, finalizersJSON []byte
 	row := &storage.Row{}
 
 	err := s.db.QueryRowContext(ctx, `
-		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
+		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at, finalizers, deletion_timestamp
 		FROM records
 		WHERE type = $1 AND tradespace = $2 AND name = $3
 	`, key.Type, key.Tradespace, key.Name).Scan(
 		&row.Type, &row.Tradespace, &row.Name, &labelsJSON, &row.Data,
-		&row.ResourceVersion, &row.CreatedAt, &row.UpdatedAt,
+		&row.ResourceVersion, &row.CreatedAt, &row.UpdatedAt, &finalizersJSON, &row.DeletionTimestamp,
 	)
 
 	if err != nil {
@@ -99,6 +104,11 @@ func (s *RowStorage) Get(ctx context.Context, key storage.Key) (*storage.Row, er
 	if err := json.Unmarshal(labelsJSON, &row.Labels); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal labels: %w", err)
 	}
+	if len(finalizersJSON) > 0 {
+		if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
+		}
+	}
 
 	return row, nil
 }
@@ -109,6 +119,10 @@ func (s *RowStorage) Update(ctx context.Context, r *storage.Row) (*storage.Row, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal labels: %w", err)
 	}
+	finalizers, err := json.Marshal(r.Finalizers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal finalizers: %w", err)
+	}
 
 	var updatedAt time.Time
 	var newVersion int64
@@ -116,10 +130,12 @@ func (s *RowStorage) Update(ctx context.Context, r *storage.Row) (*storage.Row, 
 	// Optimistic locking with resource_version
 	err = s.db.QueryRowContext(ctx, `
 		UPDATE records
-		SET labels = $1, data = $2, resource_version = resource_version + 1, updated_at = NOW()
-		WHERE type = $3 AND tradespace = $4 AND name = $5 AND resource_version = $6
+		SET labels = $1, data = $2, resource_version = resource_version + 1, updated_at = NOW(),
+		    finalizers = $3, deletion_timestamp = $4
+		WHERE type = $5 AND tradespace = $6 AND name = $7 AND resource_version = $8
 		RETURNING resource_version, updated_at
-	`, labels, r.Data, r.Type, r.Tradespace, r.Name, r.ResourceVersion).Scan(&newVersion, &updatedAt)
+	`, labels, r.Data, finalizers, r.DeletionTimestamp,
+		r.Type, r.Tradespace, r.Name, r.ResourceVersion).Scan(&newVersion, &updatedAt)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -137,14 +153,16 @@ func (s *RowStorage) Update(ctx context.Context, r *storage.Row) (*storage.Row, 
 	}
 
 	return &storage.Row{
-		Type:            r.Type,
-		Tradespace:      r.Tradespace,
-		Name:            r.Name,
-		Labels:          r.Labels,
-		Data:            r.Data,
-		ResourceVersion: newVersion,
-		CreatedAt:       r.CreatedAt,
-		UpdatedAt:       updatedAt,
+		Type:              r.Type,
+		Tradespace:        r.Tradespace,
+		Name:              r.Name,
+		Labels:            r.Labels,
+		Data:              r.Data,
+		ResourceVersion:   newVersion,
+		CreatedAt:         r.CreatedAt,
+		UpdatedAt:         updatedAt,
+		Finalizers:        r.Finalizers,
+		DeletionTimestamp: r.DeletionTimestamp,
 	}, nil
 }
 
@@ -197,7 +215,7 @@ func (s *RowStorage) List(ctx context.Context, q storage.Query) ([]*storage.Row,
 	}
 
 	query := fmt.Sprintf(`
-		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
+		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at, finalizers, deletion_timestamp
 		FROM records
 		WHERE %s
 		ORDER BY created_at ASC
@@ -215,12 +233,12 @@ func (s *RowStorage) List(ctx context.Context, q storage.Query) ([]*storage.Row,
 
 	var results []*storage.Row
 	for rows.Next() {
-		var labelsJSON []byte
+		var labelsJSON, finalizersJSON []byte
 		row := &storage.Row{}
 
 		err := rows.Scan(
 			&row.Type, &row.Tradespace, &row.Name, &labelsJSON, &row.Data,
-			&row.ResourceVersion, &row.CreatedAt, &row.UpdatedAt,
+			&row.ResourceVersion, &row.CreatedAt, &row.UpdatedAt, &finalizersJSON, &row.DeletionTimestamp,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
@@ -228,6 +246,11 @@ func (s *RowStorage) List(ctx context.Context, q storage.Query) ([]*storage.Row,
 
 		if err := json.Unmarshal(labelsJSON, &row.Labels); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal labels: %w", err)
+		}
+		if len(finalizersJSON) > 0 {
+			if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
+			}
 		}
 
 		results = append(results, row)

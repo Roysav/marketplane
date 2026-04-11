@@ -62,14 +62,33 @@ func (s *Storage) migrate(ctx context.Context) error {
 		resource_version INTEGER NOT NULL DEFAULT 1,
 		created_at TEXT NOT NULL,
 		updated_at TEXT NOT NULL,
+		finalizers TEXT NOT NULL DEFAULT '[]',
+		deletion_timestamp TEXT,
 		PRIMARY KEY (type, tradespace, name)
 	);
 
 	CREATE INDEX IF NOT EXISTS idx_rows_type ON rows(type);
 	CREATE INDEX IF NOT EXISTS idx_rows_tradespace ON rows(tradespace);
 	`
-	_, err := s.db.ExecContext(ctx, schema)
-	return err
+	if _, err := s.db.ExecContext(ctx, schema); err != nil {
+		return err
+	}
+	// Add columns for pre-existing databases.
+	// modernc.org/sqlite does not support "ADD COLUMN IF NOT EXISTS", so we attempt
+	// the ALTER and ignore "duplicate column" / "already exists" errors.
+	for _, stmt := range []string{
+		`ALTER TABLE rows ADD COLUMN finalizers TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE rows ADD COLUMN deletion_timestamp TEXT`,
+	} {
+		if _, err := s.db.ExecContext(ctx, stmt); err != nil {
+			msg := strings.ToLower(err.Error())
+			if strings.Contains(msg, "duplicate column") || strings.Contains(msg, "already exists") {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, error) {
@@ -78,11 +97,13 @@ func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, err
 
 	now := time.Now().UTC()
 	labelsJSON, _ := json.Marshal(r.Labels)
+	finalizersJSON, _ := json.Marshal(r.Finalizers)
 
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO rows (type, tradespace, name, labels, data, resource_version, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-	`, r.Type, r.Tradespace, r.Name, labelsJSON, r.Data, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano))
+		INSERT INTO rows (type, tradespace, name, labels, data, resource_version, created_at, updated_at, finalizers, deletion_timestamp)
+		VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+	`, r.Type, r.Tradespace, r.Name, labelsJSON, r.Data, now.Format(time.RFC3339Nano), now.Format(time.RFC3339Nano),
+		finalizersJSON, nil)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
@@ -100,12 +121,13 @@ func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, err
 		ResourceVersion: 1,
 		CreatedAt:       now,
 		UpdatedAt:       now,
+		Finalizers:      r.Finalizers,
 	}, nil
 }
 
 func (s *Storage) Get(ctx context.Context, key storage.Key) (*storage.Row, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
+		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at, finalizers, deletion_timestamp
 		FROM rows
 		WHERE type = ? AND tradespace = ? AND name = ?
 	`, key.Type, key.Tradespace, key.Name)
@@ -119,12 +141,22 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, err
 
 	now := time.Now().UTC()
 	labelsJSON, _ := json.Marshal(r.Labels)
+	finalizersJSON, _ := json.Marshal(r.Finalizers)
+
+	var deletionTimestamp *string
+	if r.DeletionTimestamp != nil {
+		ts := r.DeletionTimestamp.UTC().Format(time.RFC3339Nano)
+		deletionTimestamp = &ts
+	}
 
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE rows
-		SET labels = ?, data = ?, resource_version = resource_version + 1, updated_at = ?
-		WHERE type = ? AND tradespace = ? AND name = ?
-	`, labelsJSON, r.Data, now.Format(time.RFC3339Nano), r.Type, r.Tradespace, r.Name)
+		SET labels = ?, data = ?, resource_version = resource_version + 1, updated_at = ?,
+		    finalizers = ?, deletion_timestamp = ?
+		WHERE type = ? AND tradespace = ? AND name = ? AND resource_version = ?
+	`, labelsJSON, r.Data, now.Format(time.RFC3339Nano),
+		finalizersJSON, deletionTimestamp,
+		r.Type, r.Tradespace, r.Name, r.ResourceVersion)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to update row: %w", err)
@@ -132,7 +164,13 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, err
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		return nil, ErrNotFound
+		var exists bool
+		s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM rows WHERE type = ? AND tradespace = ? AND name = ?)`,
+			r.Type, r.Tradespace, r.Name).Scan(&exists)
+		if !exists {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("conflict: resource version mismatch")
 	}
 
 	return s.Get(ctx, r.Key())
@@ -161,7 +199,7 @@ func (s *Storage) Delete(ctx context.Context, key storage.Key) error {
 
 func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Row, error) {
 	query := `
-		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at
+		SELECT type, tradespace, name, labels, data, resource_version, created_at, updated_at, finalizers, deletion_timestamp
 		FROM rows
 		WHERE type = ?
 	`
@@ -207,17 +245,19 @@ func (s *Storage) Close() error {
 
 func scanRow(row *sql.Row) (*storage.Row, error) {
 	var (
-		typ             string
-		tradespace      string
-		name            string
-		labelsJSON      sql.NullString
-		data            sql.NullString
-		resourceVersion int64
-		createdAt       string
-		updatedAt       string
+		typ               string
+		tradespace        string
+		name              string
+		labelsJSON        sql.NullString
+		data              sql.NullString
+		resourceVersion   int64
+		createdAt         string
+		updatedAt         string
+		finalizersJSON    sql.NullString
+		deletionTimestamp sql.NullString
 	)
 
-	err := row.Scan(&typ, &tradespace, &name, &labelsJSON, &data, &resourceVersion, &createdAt, &updatedAt)
+	err := row.Scan(&typ, &tradespace, &name, &labelsJSON, &data, &resourceVersion, &createdAt, &updatedAt, &finalizersJSON, &deletionTimestamp)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
@@ -225,33 +265,46 @@ func scanRow(row *sql.Row) (*storage.Row, error) {
 		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
 
-	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
+	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt, finalizersJSON, deletionTimestamp)
 }
 
 func scanRows(rows *sql.Rows) (*storage.Row, error) {
 	var (
-		typ             string
-		tradespace      string
-		name            string
-		labelsJSON      sql.NullString
-		data            sql.NullString
-		resourceVersion int64
-		createdAt       string
-		updatedAt       string
+		typ               string
+		tradespace        string
+		name              string
+		labelsJSON        sql.NullString
+		data              sql.NullString
+		resourceVersion   int64
+		createdAt         string
+		updatedAt         string
+		finalizersJSON    sql.NullString
+		deletionTimestamp sql.NullString
 	)
 
-	err := rows.Scan(&typ, &tradespace, &name, &labelsJSON, &data, &resourceVersion, &createdAt, &updatedAt)
+	err := rows.Scan(&typ, &tradespace, &name, &labelsJSON, &data, &resourceVersion, &createdAt, &updatedAt, &finalizersJSON, &deletionTimestamp)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan row: %w", err)
 	}
 
-	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt)
+	return buildRow(typ, tradespace, name, labelsJSON, data, resourceVersion, createdAt, updatedAt, finalizersJSON, deletionTimestamp)
 }
 
-func buildRow(typ, tradespace, name string, labelsJSON, data sql.NullString, resourceVersion int64, createdAt, updatedAt string) (*storage.Row, error) {
+func buildRow(typ, tradespace, name string, labelsJSON, data sql.NullString, resourceVersion int64, createdAt, updatedAt string, finalizersJSON, deletionTimestamp sql.NullString) (*storage.Row, error) {
 	var labels map[string]string
 	if labelsJSON.Valid {
 		json.Unmarshal([]byte(labelsJSON.String), &labels)
+	}
+
+	var finalizers []string
+	if finalizersJSON.Valid && finalizersJSON.String != "" {
+		json.Unmarshal([]byte(finalizersJSON.String), &finalizers)
+	}
+
+	var deletionTS *time.Time
+	if deletionTimestamp.Valid && deletionTimestamp.String != "" {
+		t, _ := time.Parse(time.RFC3339Nano, deletionTimestamp.String)
+		deletionTS = &t
 	}
 
 	created, _ := time.Parse(time.RFC3339Nano, createdAt)
@@ -263,13 +316,15 @@ func buildRow(typ, tradespace, name string, labelsJSON, data sql.NullString, res
 	}
 
 	return &storage.Row{
-		Type:            typ,
-		Tradespace:      tradespace,
-		Name:            name,
-		Labels:          labels,
-		Data:            dataStr,
-		ResourceVersion: resourceVersion,
-		CreatedAt:       created,
-		UpdatedAt:       updated,
+		Type:              typ,
+		Tradespace:        tradespace,
+		Name:              name,
+		Labels:            labels,
+		Data:              dataStr,
+		ResourceVersion:   resourceVersion,
+		CreatedAt:         created,
+		UpdatedAt:         updated,
+		Finalizers:        finalizers,
+		DeletionTimestamp: deletionTS,
 	}, nil
 }
