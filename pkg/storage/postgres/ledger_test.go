@@ -260,6 +260,60 @@ func TestLedgerGetByTarget_NotFound(t *testing.T) {
 	}
 }
 
+func TestLedgerGetByAllocation(t *testing.T) {
+	s := newTestLedgerStorage(t)
+	ctx := context.Background()
+
+	err := s.Append(ctx, &storage.LedgerEntry{
+		Tradespace:     "trading-ns",
+		Currency:       "USD",
+		Amount:         "100.00",
+		AllocationName: "alloc-001",
+		TargetType:     "core/v1/Deposit",
+		TargetName:     "deposit-001",
+	})
+	if err != nil {
+		t.Fatalf("Append failed: %v", err)
+	}
+
+	got, err := s.GetByAllocation(ctx, "trading-ns", "alloc-001")
+	if err != nil {
+		t.Fatalf("GetByAllocation failed: %v", err)
+	}
+	if got.TargetName != "deposit-001" {
+		t.Errorf("TargetName = %s, want deposit-001", got.TargetName)
+	}
+}
+
+func TestLedgerAppend_AllocationApplied(t *testing.T) {
+	s := newTestLedgerStorage(t)
+	ctx := context.Background()
+
+	err := s.Append(ctx, &storage.LedgerEntry{
+		Tradespace:     "trading-ns",
+		Currency:       "USD",
+		Amount:         "100.00",
+		AllocationName: "alloc-001",
+		TargetType:     "core/v1/Deposit",
+		TargetName:     "deposit-001",
+	})
+	if err != nil {
+		t.Fatalf("first Append failed: %v", err)
+	}
+
+	err = s.Append(ctx, &storage.LedgerEntry{
+		Tradespace:     "trading-ns",
+		Currency:       "USD",
+		Amount:         "100.00",
+		AllocationName: "alloc-001",
+		TargetType:     "core/v1/Deposit",
+		TargetName:     "deposit-002",
+	})
+	if !errors.Is(err, storage.ErrAllocationApplied) {
+		t.Fatalf("expected ErrAllocationApplied, got: %v", err)
+	}
+}
+
 func TestLedgerList(t *testing.T) {
 	s := newTestLedgerStorage(t)
 	ctx := context.Background()

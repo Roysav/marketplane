@@ -196,6 +196,20 @@ func (c *AllocationController) reconcile(ctx context.Context, rec *pb.Record) er
 		return c.rejectAllocation(ctx, rec, "missing required fields in spec")
 	}
 
+	existing, err := c.ledger.GetByAllocation(ctx, &pb.LedgerGetByAllocationRequest{
+		Tradespace:     tradespace,
+		AllocationName: name,
+	})
+	if err == nil && existing.GetEntry() != nil {
+		return c.approveAllocation(ctx, rec, existing.Entry.GetId())
+	}
+	if err != nil {
+		st, ok := status.FromError(err)
+		if !ok || st.Code() != codes.NotFound {
+			return err
+		}
+	}
+
 	// Attempt to append to ledger
 	resp, err := c.ledger.Append(ctx, &pb.LedgerAppendRequest{
 		Tradespace:     tradespace,
@@ -212,6 +226,12 @@ func (c *AllocationController) reconcile(ctx context.Context, rec *pb.Record) er
 			case codes.FailedPrecondition:
 				return c.rejectAllocation(ctx, rec, "insufficient balance")
 			case codes.AlreadyExists:
+				if existing, getErr := c.ledger.GetByAllocation(ctx, &pb.LedgerGetByAllocationRequest{
+					Tradespace:     tradespace,
+					AllocationName: name,
+				}); getErr == nil && existing.GetEntry() != nil {
+					return c.approveAllocation(ctx, rec, existing.Entry.GetId())
+				}
 				return c.rejectAllocation(ctx, rec, "target already has an allocation")
 			}
 		}

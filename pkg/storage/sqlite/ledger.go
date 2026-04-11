@@ -62,6 +62,7 @@ func (s *LedgerStorage) migrate(ctx context.Context) error {
 
 	CREATE INDEX IF NOT EXISTS idx_ledger_balance ON ledger(tradespace, currency);
 	CREATE INDEX IF NOT EXISTS idx_ledger_tradespace ON ledger(tradespace);
+	CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_allocation ON ledger(tradespace, allocation_name);
 	`
 	_, err := s.db.ExecContext(ctx, schema)
 	return err
@@ -93,50 +94,40 @@ func (s *LedgerStorage) Append(ctx context.Context, e *storage.LedgerEntry) erro
 	}
 	defer tx.Rollback()
 
-	// Atomic INSERT with conditions:
-	// 1. Target must not have an existing allocation (one-to-one)
-	// 2. For negative amounts, balance + amount must be >= 0
-	result, err := tx.ExecContext(ctx, `
+	if exists, err := ledgerEntryExists(tx, ctx, `
+		SELECT 1 FROM ledger
+		WHERE tradespace = ? AND allocation_name = ?
+	`, e.Tradespace, e.AllocationName); err != nil {
+		return fmt.Errorf("failed to check existing allocation entry: %w", err)
+	} else if exists {
+		return storage.ErrAllocationApplied
+	}
+
+	if exists, err := ledgerEntryExists(tx, ctx, `
+		SELECT 1 FROM ledger
+		WHERE tradespace = ? AND target_type = ? AND target_name = ?
+	`, e.Tradespace, e.TargetType, e.TargetName); err != nil {
+		return fmt.Errorf("failed to check existing target entry: %w", err)
+	} else if exists {
+		return storage.ErrAlreadyAllocated
+	}
+
+	if amt, _ := decimal.NewFromString(e.Amount); amt.IsNegative() {
+		balance, err := s.balanceTx(ctx, tx, e.Tradespace, e.Currency)
+		if err != nil {
+			return err
+		}
+		if balance.Add(amt).IsNegative() {
+			return storage.ErrInsufficientBalance
+		}
+	}
+
+	_, err = tx.ExecContext(ctx, `
 		INSERT INTO ledger (id, tradespace, currency, amount, allocation_name, target_type, target_name, created_at)
-		SELECT ?, ?, ?, ?, ?, ?, ?, ?
-		WHERE
-			NOT EXISTS (
-				SELECT 1 FROM ledger
-				WHERE tradespace = ? AND target_type = ? AND target_name = ?
-			)
-			AND (
-				CAST(? AS REAL) >= 0
-				OR
-				COALESCE(
-					(SELECT SUM(CAST(amount AS REAL)) FROM ledger WHERE tradespace = ? AND currency = ?),
-					0
-				) + CAST(? AS REAL) >= 0
-			)
-	`,
-		e.ID, e.Tradespace, e.Currency, e.Amount, e.AllocationName, e.TargetType, e.TargetName, e.CreatedAt.Format(time.RFC3339Nano),
-		e.Tradespace, e.TargetType, e.TargetName, // for NOT EXISTS check
-		e.Amount, e.Tradespace, e.Currency, e.Amount, // for balance check
-	)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`, e.ID, e.Tradespace, e.Currency, e.Amount, e.AllocationName, e.TargetType, e.TargetName, e.CreatedAt.Format(time.RFC3339Nano))
 	if err != nil {
 		return fmt.Errorf("failed to insert ledger entry: %w", err)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to get rows affected: %w", err)
-	}
-
-	if rows == 0 {
-		// Insert failed - determine why
-		var exists int
-		err = tx.QueryRowContext(ctx, `
-			SELECT 1 FROM ledger
-			WHERE tradespace = ? AND target_type = ? AND target_name = ?
-		`, e.Tradespace, e.TargetType, e.TargetName).Scan(&exists)
-		if err == nil {
-			return storage.ErrAlreadyAllocated
-		}
-		return storage.ErrInsufficientBalance
 	}
 
 	return tx.Commit()
@@ -144,31 +135,10 @@ func (s *LedgerStorage) Append(ctx context.Context, e *storage.LedgerEntry) erro
 
 // Balance returns SUM(amount) for tradespace+currency.
 func (s *LedgerStorage) Balance(ctx context.Context, tradespace, currency string) (string, error) {
-	var balanceStr sql.NullString
-	err := s.db.QueryRowContext(ctx, `
-		SELECT SUM(CAST(amount AS REAL)) FROM ledger
-		WHERE tradespace = ? AND currency = ?
-	`, tradespace, currency).Scan(&balanceStr)
+	balance, err := s.balanceQuery(ctx, s.db, tradespace, currency)
 	if err != nil {
-		return "0", fmt.Errorf("failed to get balance: %w", err)
+		return "0", err
 	}
-
-	if !balanceStr.Valid || balanceStr.String == "" {
-		return "0", nil
-	}
-
-	// Parse and reformat to ensure consistent decimal representation
-	balance, err := decimal.NewFromString(balanceStr.String)
-	if err != nil {
-		// SQLite returns scientific notation sometimes
-		var f float64
-		if _, scanErr := fmt.Sscanf(balanceStr.String, "%e", &f); scanErr == nil {
-			balance = decimal.NewFromFloat(f)
-		} else {
-			return "0", nil
-		}
-	}
-
 	return balance.String(), nil
 }
 
@@ -179,6 +149,17 @@ func (s *LedgerStorage) GetByTarget(ctx context.Context, tradespace, targetType,
 		FROM ledger
 		WHERE tradespace = ? AND target_type = ? AND target_name = ?
 	`, tradespace, targetType, targetName)
+
+	return scanLedgerEntry(row)
+}
+
+// GetByAllocation returns entry for an Allocation record.
+func (s *LedgerStorage) GetByAllocation(ctx context.Context, tradespace, allocationName string) (*storage.LedgerEntry, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, tradespace, currency, amount, allocation_name, target_type, target_name, created_at
+		FROM ledger
+		WHERE tradespace = ? AND allocation_name = ?
+	`, tradespace, allocationName)
 
 	return scanLedgerEntry(row)
 }
@@ -211,6 +192,52 @@ func (s *LedgerStorage) List(ctx context.Context, tradespace string) ([]*storage
 // Close releases resources.
 func (s *LedgerStorage) Close() error {
 	return s.db.Close()
+}
+
+type ledgerQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func (s *LedgerStorage) balanceTx(ctx context.Context, tx *sql.Tx, tradespace, currency string) (decimal.Decimal, error) {
+	return s.balanceQuery(ctx, tx, tradespace, currency)
+}
+
+func (s *LedgerStorage) balanceQuery(ctx context.Context, q ledgerQueryer, tradespace, currency string) (decimal.Decimal, error) {
+	var balanceStr sql.NullString
+	err := q.QueryRowContext(ctx, `
+		SELECT SUM(CAST(amount AS REAL)) FROM ledger
+		WHERE tradespace = ? AND currency = ?
+	`, tradespace, currency).Scan(&balanceStr)
+	if err != nil {
+		return decimal.Zero, fmt.Errorf("failed to get balance: %w", err)
+	}
+
+	if !balanceStr.Valid || balanceStr.String == "" {
+		return decimal.Zero, nil
+	}
+
+	balance, err := decimal.NewFromString(balanceStr.String)
+	if err != nil {
+		var f float64
+		if _, scanErr := fmt.Sscanf(balanceStr.String, "%e", &f); scanErr == nil {
+			return decimal.NewFromFloat(f), nil
+		}
+		return decimal.Zero, nil
+	}
+
+	return balance, nil
+}
+
+func ledgerEntryExists(tx *sql.Tx, ctx context.Context, query string, args ...any) (bool, error) {
+	var exists int
+	err := tx.QueryRowContext(ctx, query, args...).Scan(&exists)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func scanLedgerEntry(row *sql.Row) (*storage.LedgerEntry, error) {

@@ -19,8 +19,9 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	LedgerService_Append_FullMethodName = "/marketplane.v1.LedgerService/Append"
-	LedgerService_List_FullMethodName   = "/marketplane.v1.LedgerService/List"
+	LedgerService_Append_FullMethodName          = "/marketplane.v1.LedgerService/Append"
+	LedgerService_GetByAllocation_FullMethodName = "/marketplane.v1.LedgerService/GetByAllocation"
+	LedgerService_List_FullMethodName            = "/marketplane.v1.LedgerService/List"
 )
 
 // LedgerServiceClient is the client API for LedgerService service.
@@ -33,6 +34,8 @@ type LedgerServiceClient interface {
 	// Returns FAILED_PRECONDITION if insufficient balance.
 	// Returns ALREADY_EXISTS if target already has an allocation.
 	Append(ctx context.Context, in *LedgerAppendRequest, opts ...grpc.CallOption) (*LedgerAppendResponse, error)
+	// GetByAllocation returns the ledger entry created for an Allocation.
+	GetByAllocation(ctx context.Context, in *LedgerGetByAllocationRequest, opts ...grpc.CallOption) (*LedgerGetByAllocationResponse, error)
 	// List returns all ledger entries for a tradespace.
 	List(ctx context.Context, in *LedgerListRequest, opts ...grpc.CallOption) (*LedgerListResponse, error)
 }
@@ -49,6 +52,16 @@ func (c *ledgerServiceClient) Append(ctx context.Context, in *LedgerAppendReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LedgerAppendResponse)
 	err := c.cc.Invoke(ctx, LedgerService_Append_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *ledgerServiceClient) GetByAllocation(ctx context.Context, in *LedgerGetByAllocationRequest, opts ...grpc.CallOption) (*LedgerGetByAllocationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LedgerGetByAllocationResponse)
+	err := c.cc.Invoke(ctx, LedgerService_GetByAllocation_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,6 +88,8 @@ type LedgerServiceServer interface {
 	// Returns FAILED_PRECONDITION if insufficient balance.
 	// Returns ALREADY_EXISTS if target already has an allocation.
 	Append(context.Context, *LedgerAppendRequest) (*LedgerAppendResponse, error)
+	// GetByAllocation returns the ledger entry created for an Allocation.
+	GetByAllocation(context.Context, *LedgerGetByAllocationRequest) (*LedgerGetByAllocationResponse, error)
 	// List returns all ledger entries for a tradespace.
 	List(context.Context, *LedgerListRequest) (*LedgerListResponse, error)
 	mustEmbedUnimplementedLedgerServiceServer()
@@ -89,6 +104,9 @@ type UnimplementedLedgerServiceServer struct{}
 
 func (UnimplementedLedgerServiceServer) Append(context.Context, *LedgerAppendRequest) (*LedgerAppendResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Append not implemented")
+}
+func (UnimplementedLedgerServiceServer) GetByAllocation(context.Context, *LedgerGetByAllocationRequest) (*LedgerGetByAllocationResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetByAllocation not implemented")
 }
 func (UnimplementedLedgerServiceServer) List(context.Context, *LedgerListRequest) (*LedgerListResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method List not implemented")
@@ -132,6 +150,24 @@ func _LedgerService_Append_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LedgerService_GetByAllocation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LedgerGetByAllocationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LedgerServiceServer).GetByAllocation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LedgerService_GetByAllocation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LedgerServiceServer).GetByAllocation(ctx, req.(*LedgerGetByAllocationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _LedgerService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LedgerListRequest)
 	if err := dec(in); err != nil {
@@ -160,6 +196,10 @@ var LedgerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Append",
 			Handler:    _LedgerService_Append_Handler,
+		},
+		{
+			MethodName: "GetByAllocation",
+			Handler:    _LedgerService_GetByAllocation_Handler,
 		},
 		{
 			MethodName: "List",

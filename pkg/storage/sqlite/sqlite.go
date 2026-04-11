@@ -123,8 +123,8 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, err
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE rows
 		SET labels = ?, data = ?, resource_version = resource_version + 1, updated_at = ?
-		WHERE type = ? AND tradespace = ? AND name = ?
-	`, labelsJSON, r.Data, now.Format(time.RFC3339Nano), r.Type, r.Tradespace, r.Name)
+		WHERE type = ? AND tradespace = ? AND name = ? AND resource_version = ?
+	`, labelsJSON, r.Data, now.Format(time.RFC3339Nano), r.Type, r.Tradespace, r.Name, r.ResourceVersion)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to update row: %w", err)
@@ -132,7 +132,18 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, err
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		return nil, ErrNotFound
+		var exists int
+		err = s.db.QueryRowContext(ctx, `
+			SELECT 1 FROM rows
+			WHERE type = ? AND tradespace = ? AND name = ?
+		`, r.Type, r.Tradespace, r.Name).Scan(&exists)
+		if err == sql.ErrNoRows {
+			return nil, ErrNotFound
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to check row existence: %w", err)
+		}
+		return nil, storage.ErrConflict
 	}
 
 	return s.Get(ctx, r.Key())

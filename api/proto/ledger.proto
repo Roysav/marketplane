@@ -13,6 +13,9 @@ service LedgerService {
   // Returns ALREADY_EXISTS if target already has an allocation.
   rpc Append(LedgerAppendRequest) returns (LedgerAppendResponse);
 
+  // GetByAllocation returns the ledger entry created for an Allocation.
+  rpc GetByAllocation(LedgerGetByAllocationRequest) returns (LedgerGetByAllocationResponse);
+
   // List returns all ledger entries for a tradespace.
   rpc List(LedgerListRequest) returns (LedgerListResponse);
 }
@@ -41,6 +44,17 @@ message LedgerAppendRequest {
 
 // LedgerAppendResponse is the response for Append.
 message LedgerAppendResponse {
+  LedgerEntry entry = 1;
+}
+
+// LedgerGetByAllocationRequest is the request for GetByAllocation.
+message LedgerGetByAllocationRequest {
+  string tradespace = 1;
+  string allocation_name = 2;
+}
+
+// LedgerGetByAllocationResponse is the response for GetByAllocation.
+message LedgerGetByAllocationResponse {
   LedgerEntry entry = 1;
 }
 

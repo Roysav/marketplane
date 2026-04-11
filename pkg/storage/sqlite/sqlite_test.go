@@ -113,10 +113,13 @@ func TestUpdate(t *testing.T) {
 		Name:       "item1",
 		Data:       `{"count":1}`,
 	}
-	s.Create(ctx, r)
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
 
-	r.Data = `{"count":2}`
-	updated, err := s.Update(ctx, r)
+	created.Data = `{"count":2}`
+	updated, err := s.Update(ctx, created)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
@@ -142,6 +145,33 @@ func TestUpdate_NotFound(t *testing.T) {
 	_, err := s.Update(ctx, r)
 	if !errors.Is(err, ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got: %v", err)
+	}
+}
+
+func TestUpdate_Conflict(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	created, err := s.Create(ctx, &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item1",
+		Data:       `{"count":1}`,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	stale := *created
+	created.Data = `{"count":2}`
+	if _, err := s.Update(ctx, created); err != nil {
+		t.Fatalf("fresh Update failed: %v", err)
+	}
+
+	stale.Data = `{"count":3}`
+	_, err = s.Update(ctx, &stale)
+	if !errors.Is(err, storage.ErrConflict) {
+		t.Fatalf("expected ErrConflict, got: %v", err)
 	}
 }
 

@@ -240,6 +240,28 @@ func TestService_ValidationError(t *testing.T) {
 	}
 }
 
+func TestService_CreateRejectsStatus(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	r := &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "myns",
+			Name:       "quota-with-status",
+		},
+		Spec: map[string]any{"balances": map[string]any{"USD": "100"}},
+		Status: map[string]any{
+			"phase": "Approved",
+		},
+	}
+
+	_, err := svc.Create(ctx, r)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got: %v", err)
+	}
+}
+
 func TestService_GetNotFound(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()

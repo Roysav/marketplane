@@ -77,6 +77,18 @@ func (s *LedgerStorage) Append(ctx context.Context, e *storage.LedgerEntry) erro
 	var existingID string
 	err = tx.QueryRowContext(ctx, `
 		SELECT id FROM ledger
+		WHERE tradespace = $1 AND allocation_name = $2
+		FOR UPDATE
+	`, e.Tradespace, e.AllocationName).Scan(&existingID)
+	if err == nil {
+		return storage.ErrAllocationApplied
+	}
+	if err != sql.ErrNoRows {
+		return fmt.Errorf("failed to check existing allocation entry: %w", err)
+	}
+
+	err = tx.QueryRowContext(ctx, `
+		SELECT id FROM ledger
 		WHERE tradespace = $1 AND target_type = $2 AND target_name = $3
 		FOR UPDATE
 	`, e.Tradespace, e.TargetType, e.TargetName).Scan(&existingID)
@@ -165,6 +177,30 @@ func (s *LedgerStorage) GetByTarget(ctx context.Context, tradespace, targetType,
 			return nil, storage.ErrNotFound
 		}
 		return nil, fmt.Errorf("failed to get ledger entry: %w", err)
+	}
+
+	entry.Amount = amount
+	return entry, nil
+}
+
+// GetByAllocation returns entry for an Allocation record.
+func (s *LedgerStorage) GetByAllocation(ctx context.Context, tradespace, allocationName string) (*storage.LedgerEntry, error) {
+	entry := &storage.LedgerEntry{}
+	var amount string
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, tradespace, currency, amount::TEXT, allocation_name, target_type, target_name, created_at
+		FROM ledger
+		WHERE tradespace = $1 AND allocation_name = $2
+	`, tradespace, allocationName).Scan(
+		&entry.ID, &entry.Tradespace, &entry.Currency, &amount,
+		&entry.AllocationName, &entry.TargetType, &entry.TargetName, &entry.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, storage.ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get ledger entry by allocation: %w", err)
 	}
 
 	entry.Amount = amount

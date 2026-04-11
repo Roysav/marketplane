@@ -10,6 +10,7 @@ import (
 var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
+	ErrConflict      = errors.New("conflict")
 )
 
 // Key uniquely identifies a row.
