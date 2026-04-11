@@ -116,6 +116,30 @@ func TestValidate_CoreTypes(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "valid User",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
+				Spec:     map[string]any{"commonName": "alice", "description": "test user"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid User - minimal",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
+				Spec:     map[string]any{"commonName": "alice"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid User - missing commonName",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
+				Spec:     map[string]any{"description": "no cn"},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -230,6 +254,7 @@ func TestIsCoreType(t *testing.T) {
 		{"core/v1/Quota", true},
 		{"core/v1/MetaRecord", true},
 		{"core/v1/StreamDefinition", true},
+		{"core/v1/User", true},
 		{"polymarket/v1/Order", false},
 	}
 
@@ -237,6 +262,47 @@ func TestIsCoreType(t *testing.T) {
 		t.Run(tt.typeStr, func(t *testing.T) {
 			if got := IsCoreType(tt.typeStr); got != tt.want {
 				t.Errorf("IsCoreType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateScope_User(t *testing.T) {
+	v, _ := newTestValidator(t)
+	ctx := context.Background()
+
+	tests := []struct {
+		name       string
+		tradespace string
+		wantErr    bool
+	}{
+		{
+			name:       "global scope - empty tradespace",
+			tradespace: "",
+			wantErr:    false,
+		},
+		{
+			name:       "global scope - default tradespace",
+			tradespace: "default",
+			wantErr:    false,
+		},
+		{
+			name:       "global scope - non-default tradespace rejected",
+			tradespace: "my-tradespace",
+			wantErr:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := &record.Record{
+				TypeMeta:   record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
+				ObjectMeta: record.ObjectMeta{Tradespace: tt.tradespace},
+				Spec:       map[string]any{"commonName": "alice"},
+			}
+			err := v.ValidateScope(ctx, r)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateScope() error = %v, wantErr = %v", err, tt.wantErr)
 			}
 		})
 	}
