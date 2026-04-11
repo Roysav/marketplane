@@ -30,13 +30,14 @@ func main() {
 		redisAddr = flag.String("redis", "localhost:6379", "Redis address")
 		debug     = flag.Bool("debug", false, "Enable debug logging")
 
-		// TLS flags — when cert+key are provided the server uses TLS.
+		// TLS flags — cert and key are required unless -insecure is set.
 		// When ca is also provided it enables mutual TLS: clients must present
 		// a certificate signed by the given CA. The client cert's CN is mapped
 		// to a core/v1/User record name for identity propagation.
-		tlsCert = flag.String("cert", "", "Path to PEM-encoded server certificate (enables TLS)")
-		tlsKey  = flag.String("key", "", "Path to PEM-encoded server private key (enables TLS)")
-		tlsCA   = flag.String("ca", "", "Path to PEM-encoded CA certificate (enables mTLS client auth)")
+		tlsCert   = flag.String("cert", "", "Path to PEM-encoded server certificate (required unless -insecure)")
+		tlsKey    = flag.String("key", "", "Path to PEM-encoded server private key (required unless -insecure)")
+		tlsCA     = flag.String("ca", "", "Path to PEM-encoded CA certificate (enables mTLS client auth)")
+		tlsInsecure = flag.Bool("insecure", false, "Disable TLS and run in plaintext mode (not for production)")
 	)
 	flag.Parse()
 
@@ -103,11 +104,12 @@ func main() {
 		Logger:  logger,
 	})
 
-	// Initialize gRPC server — optionally with TLS/mTLS credentials and
-	// interceptors that inject the caller's TLS identity into the context.
+	// Initialize gRPC server — TLS is required by default.
+	// Pass -insecure to disable TLS (logs a warning; not for production use).
 	var grpcOpts []grpc.ServerOption
 
-	if *tlsCert != "" && *tlsKey != "" {
+	switch {
+	case *tlsCert != "" && *tlsKey != "":
 		creds, err := auth.ServerCredentials(*tlsCert, *tlsKey, *tlsCA)
 		if err != nil {
 			logger.Error("failed to load TLS credentials", "error", err)
@@ -123,8 +125,11 @@ func main() {
 		} else {
 			logger.Info("TLS enabled (server-only, no client auth)")
 		}
-	} else {
-		logger.Warn("TLS disabled — running in plaintext mode (use -cert/-key/-ca for production)")
+	case *tlsInsecure:
+		logger.Warn("TLS DISABLED — running in plaintext mode; do not use in production")
+	default:
+		logger.Error("TLS credentials are required; provide -cert and -key, or use -insecure to disable TLS (not for production)")
+		os.Exit(1)
 	}
 
 	grpcServer := grpc.NewServer(grpcOpts...)
