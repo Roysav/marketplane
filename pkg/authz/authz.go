@@ -375,8 +375,7 @@ func determineUpdateVerbs(current, updated *record.Record) ([]string, error) {
 
 	required := make(map[string]struct{})
 	if !reflect.DeepEqual(current.Spec, updated.Spec) ||
-		!maps.Equal(current.ObjectMeta.Labels, updated.ObjectMeta.Labels) ||
-		!maps.Equal(current.ObjectMeta.Annotations, updated.ObjectMeta.Annotations) {
+		!maps.Equal(current.ObjectMeta.Labels, updated.ObjectMeta.Labels) {
 		required[VerbUpdateSpec] = struct{}{}
 	}
 	if !reflect.DeepEqual(current.Status, updated.Status) {
