@@ -12,10 +12,7 @@ CREATE TABLE IF NOT EXISTS ledger (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- One-to-one: each target can only have one allocation
-    UNIQUE(tradespace, target_type, target_name),
-
-    -- Each Allocation can only be approved once
-    UNIQUE(tradespace, allocation_name)
+    UNIQUE(tradespace, target_type, target_name)
 );
 
 -- Index for balance queries (SUM by tradespace+currency)
