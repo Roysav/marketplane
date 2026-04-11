@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/xeipuuv/gojsonschema"
@@ -40,6 +41,9 @@ type StreamService struct {
 	rows    storage.RowStorage
 	streams storage.StreamStorage
 	logger  *slog.Logger
+	// defCache caches stream definitions by name. Stream definitions are
+	// immutable (schema changes require a new version), so this is safe.
+	defCache sync.Map // string -> *StreamDefinitionSpec
 }
 
 // StreamServiceConfig holds dependencies for StreamService.
@@ -134,8 +138,14 @@ func (s *StreamService) Watch(ctx context.Context, key StreamKey) (<-chan storag
 	return s.streams.Watch(ctx, streamKey)
 }
 
-// getDefinition retrieves the StreamDefinition by key.
+// getDefinition retrieves the StreamDefinition by key, using an in-memory
+// cache to avoid redundant database lookups. Definitions are immutable by
+// design (schema changes require creating a new version), so this is safe.
 func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*StreamDefinitionSpec, error) {
+	if v, ok := s.defCache.Load(key.Name); ok {
+		return v.(*StreamDefinitionSpec), nil
+	}
+
 	// StreamDefinition is stored with name as the identifier
 	// We need to find the one that matches group/version/kind
 	row, err := s.rows.Get(ctx, storage.Key{
@@ -153,6 +163,7 @@ func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*Stre
 		return nil, fmt.Errorf("invalid stream definition data: %w", err)
 	}
 
+	s.defCache.Store(key.Name, &spec)
 	return &spec, nil
 }
 

@@ -28,13 +28,13 @@ func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClie
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
+	rows.DB().ExecContext(ctx, "DELETE FROM records WHERE type = 'core/v1/Allocation'")
 
 	ledger, err := postgres.NewLedgerStorage(ctx, testDSN)
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	_, err = ledger.DB().ExecContext(ctx, "TRUNCATE ledger CASCADE")
+	_, err = ledger.DB().ExecContext(ctx, "DELETE FROM ledger")
 	if err != nil {
 		t.Fatalf("%e", err)
 	}

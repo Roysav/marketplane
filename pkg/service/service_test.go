@@ -22,7 +22,7 @@ func newTestService(t *testing.T) *Service {
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
+	rows.DB().ExecContext(ctx, "DELETE FROM records WHERE type IN ('core/v1/Tradespace', 'core/v1/Quota', 'core/v1/MetaRecord')")
 	t.Cleanup(func() { rows.Close() })
 
 	// Use a discarding logger for tests

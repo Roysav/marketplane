@@ -21,7 +21,7 @@ func newTestStreamService(t *testing.T) (*StreamService, *goredis.Client) {
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
+	rows.DB().ExecContext(ctx, "DELETE FROM records WHERE type = 'core/v1/StreamDefinition'")
 	t.Cleanup(func() { rows.Close() })
 
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})
