@@ -86,16 +86,18 @@ func (x *TypeMeta) GetKind() string {
 
 // ObjectMeta contains metadata about a record.
 type ObjectMeta struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Tradespace      string                 `protobuf:"bytes,2,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
-	Labels          map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Annotations     map[string]string      `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ResourceVersion int64                  `protobuf:"varint,5,opt,name=resource_version,json=resourceVersion,proto3" json:"resource_version,omitempty"`
-	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Name              string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Tradespace        string                 `protobuf:"bytes,2,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
+	Labels            map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Annotations       map[string]string      `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	ResourceVersion   int64                  `protobuf:"varint,5,opt,name=resource_version,json=resourceVersion,proto3" json:"resource_version,omitempty"`
+	CreatedAt         *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt         *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	Finalizers        []string               `protobuf:"bytes,8,rep,name=finalizers,proto3" json:"finalizers,omitempty"`
+	DeletionTimestamp *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=deletion_timestamp,json=deletionTimestamp,proto3" json:"deletion_timestamp,omitempty"` // null if not terminating
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *ObjectMeta) Reset() {
@@ -173,6 +175,20 @@ func (x *ObjectMeta) GetCreatedAt() *timestamppb.Timestamp {
 func (x *ObjectMeta) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *ObjectMeta) GetFinalizers() []string {
+	if x != nil {
+		return x.Finalizers
+	}
+	return nil
+}
+
+func (x *ObjectMeta) GetDeletionTimestamp() *timestamppb.Timestamp {
+	if x != nil {
+		return x.DeletionTimestamp
 	}
 	return nil
 }
@@ -850,7 +866,7 @@ const file_record_proto_rawDesc = "" +
 	"\bTypeMeta\x12\x14\n" +
 	"\x05group\x18\x01 \x01(\tR\x05group\x12\x18\n" +
 	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\"\xeb\x03\n" +
+	"\x04kind\x18\x03 \x01(\tR\x04kind\"\xd6\x04\n" +
 	"\n" +
 	"ObjectMeta\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
@@ -863,7 +879,11 @@ const file_record_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x1e\n" +
+	"\n" +
+	"finalizers\x18\b \x03(\tR\n" +
+	"finalizers\x12I\n" +
+	"\x12deletion_timestamp\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\x11deletionTimestamp\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
@@ -968,35 +988,36 @@ var file_record_proto_depIdxs = []int32{
 	16, // 1: marketplane.v1.ObjectMeta.annotations:type_name -> marketplane.v1.ObjectMeta.AnnotationsEntry
 	18, // 2: marketplane.v1.ObjectMeta.created_at:type_name -> google.protobuf.Timestamp
 	18, // 3: marketplane.v1.ObjectMeta.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: marketplane.v1.Record.type_meta:type_name -> marketplane.v1.TypeMeta
-	1,  // 5: marketplane.v1.Record.object_meta:type_name -> marketplane.v1.ObjectMeta
-	19, // 6: marketplane.v1.Record.spec:type_name -> google.protobuf.Struct
-	19, // 7: marketplane.v1.Record.status:type_name -> google.protobuf.Struct
-	2,  // 8: marketplane.v1.CreateRequest.record:type_name -> marketplane.v1.Record
-	2,  // 9: marketplane.v1.CreateResponse.record:type_name -> marketplane.v1.Record
-	2,  // 10: marketplane.v1.GetResponse.record:type_name -> marketplane.v1.Record
-	2,  // 11: marketplane.v1.UpdateRequest.record:type_name -> marketplane.v1.Record
-	2,  // 12: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
-	17, // 13: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
-	2,  // 14: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
-	2,  // 15: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
-	3,  // 16: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
-	5,  // 17: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
-	7,  // 18: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
-	9,  // 19: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
-	11, // 20: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
-	13, // 21: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
-	4,  // 22: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
-	6,  // 23: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
-	8,  // 24: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
-	10, // 25: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
-	12, // 26: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
-	14, // 27: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
-	22, // [22:28] is the sub-list for method output_type
-	16, // [16:22] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	18, // 4: marketplane.v1.ObjectMeta.deletion_timestamp:type_name -> google.protobuf.Timestamp
+	0,  // 5: marketplane.v1.Record.type_meta:type_name -> marketplane.v1.TypeMeta
+	1,  // 6: marketplane.v1.Record.object_meta:type_name -> marketplane.v1.ObjectMeta
+	19, // 7: marketplane.v1.Record.spec:type_name -> google.protobuf.Struct
+	19, // 8: marketplane.v1.Record.status:type_name -> google.protobuf.Struct
+	2,  // 9: marketplane.v1.CreateRequest.record:type_name -> marketplane.v1.Record
+	2,  // 10: marketplane.v1.CreateResponse.record:type_name -> marketplane.v1.Record
+	2,  // 11: marketplane.v1.GetResponse.record:type_name -> marketplane.v1.Record
+	2,  // 12: marketplane.v1.UpdateRequest.record:type_name -> marketplane.v1.Record
+	2,  // 13: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
+	17, // 14: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
+	2,  // 15: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
+	2,  // 16: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
+	3,  // 17: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
+	5,  // 18: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
+	7,  // 19: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
+	9,  // 20: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
+	11, // 21: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
+	13, // 22: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
+	4,  // 23: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
+	6,  // 24: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
+	8,  // 25: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
+	10, // 26: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
+	12, // 27: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
+	14, // 28: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
+	23, // [23:29] is the sub-list for method output_type
+	17, // [17:23] is the sub-list for method input_type
+	17, // [17:17] is the sub-list for extension type_name
+	17, // [17:17] is the sub-list for extension extendee
+	0,  // [0:17] is the sub-list for field type_name
 }
 
 func init() { file_record_proto_init() }

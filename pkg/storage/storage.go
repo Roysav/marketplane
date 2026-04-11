@@ -11,6 +11,7 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
 	ErrConflict      = errors.New("conflict")
+	ErrTerminating   = errors.New("record is terminating")
 )
 
 // Key uniquely identifies a row.
@@ -28,9 +29,11 @@ type Row struct {
 	Labels     map[string]string
 	Data       string // JSON blob
 
-	ResourceVersion int64
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	ResourceVersion   int64
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	Finalizers        []string
+	DeletionTimestamp *time.Time
 }
 
 // Key returns the row's key.

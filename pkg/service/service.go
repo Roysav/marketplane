@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
@@ -20,6 +21,7 @@ var (
 	ErrConflict      = errors.New("record conflict")
 	ErrValidation    = errors.New("validation failed")
 	ErrInvalidScope  = errors.New("invalid scope")
+	ErrTerminating   = errors.New("record is terminating")
 )
 
 // Config holds configuration for the Service.
@@ -108,6 +110,19 @@ func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*r
 
 // Update updates an existing record.
 func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record, error) {
+	// Fetch current state to enforce finalizer rules.
+	current, err := s.Get(ctx, r.TypeMeta.GVK().Type(), r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
+	if err != nil {
+		return nil, err
+	}
+	// Reject adding finalizers to a terminating record.
+	if current.ObjectMeta.IsTerminating() {
+		added := setDiff(r.ObjectMeta.Finalizers, current.ObjectMeta.Finalizers)
+		if len(added) > 0 {
+			return nil, fmt.Errorf("%w: cannot add finalizers to a terminating record: %v", ErrTerminating, added)
+		}
+	}
+
 	// Validate the record
 	if err := s.validator.Validate(ctx, r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
@@ -120,7 +135,7 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 	}
 
 	// Update
-	updated, err := s.rows.Update(ctx, row)
+	persistedRow, err := s.rows.Update(ctx, row)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
@@ -131,19 +146,51 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 		return nil, err
 	}
 
-	// Publish event
-	s.publishEvent(ctx, "updated", r)
+	updated, err := rowToRecord(persistedRow)
+	if err != nil {
+		return nil, err
+	}
 
-	return rowToRecord(updated)
+	s.publishEvent(ctx, "updated", updated)
+
+	// Auto-trigger hard delete when the last finalizer is removed from a terminating record.
+	if updated.ObjectMeta.IsTerminating() && len(updated.ObjectMeta.Finalizers) == 0 {
+		if err := s.hardDelete(ctx, updated); err != nil {
+			return nil, err
+		}
+		return updated, nil
+	}
+
+	return updated, nil
 }
 
-// Delete removes a record.
+// Delete removes a record. If the record has finalizers, it is soft-deleted
+// (DeletionTimestamp set) and a "terminating" event is published. The hard
+// delete happens automatically when the last finalizer is removed via Update.
 func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) error {
-	err := s.rows.Delete(ctx, storage.Key{
-		Type:       typeStr,
-		Tradespace: tradespace,
-		Name:       name,
-	})
+	current, err := s.Get(ctx, typeStr, tradespace, name)
+	if err != nil {
+		return err
+	}
+
+	// Already terminating — idempotent.
+	if current.ObjectMeta.IsTerminating() {
+		return nil
+	}
+
+	// Atomically mark as terminating via optimistic-lock Update.
+	// This closes the race with a concurrent Update that might add a finalizer:
+	// if another writer bumped the ResourceVersion between our Get and this
+	// Update, the Update will fail with a conflict and the caller should retry.
+	now := time.Now().UTC()
+	current.ObjectMeta.DeletionTimestamp = &now
+
+	row, err := recordToRow(current)
+	if err != nil {
+		return err
+	}
+
+	persisted, err := s.rows.Update(ctx, row)
 	if err != nil {
 		if isNotFound(err) {
 			return fmt.Errorf("%w: %s %s/%s", ErrNotFound, typeStr, tradespace, name)
@@ -151,12 +198,13 @@ func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) 
 		return err
 	}
 
-	// Publish event
-	s.publishEvent(ctx, "deleted", &record.Record{
-		TypeMeta:   record.TypeMetaFromType(typeStr),
-		ObjectMeta: record.ObjectMeta{Tradespace: tradespace, Name: name},
-	})
+	// Optimistic lock succeeded — finalizer set is now frozen.
+	// Hard-delete immediately when there are no finalizers.
+	if len(persisted.Finalizers) == 0 {
+		return s.hardDelete(ctx, current)
+	}
 
+	s.publishEvent(ctx, "terminating", current)
 	return nil
 }
 
@@ -236,6 +284,34 @@ func eventTopic(typeStr string) string {
 	return "record:" + typeStr
 }
 
+func (s *Service) hardDelete(ctx context.Context, r *record.Record) error {
+	err := s.rows.Delete(ctx, storage.Key{
+		Type:       r.TypeMeta.GVK().Type(),
+		Tradespace: r.ObjectMeta.Tradespace,
+		Name:       r.ObjectMeta.Name,
+	})
+	if err != nil && !isNotFound(err) {
+		return err
+	}
+	s.publishEvent(ctx, "deleted", r)
+	return nil
+}
+
+// setDiff returns elements in a that are not in b.
+func setDiff(a, b []string) []string {
+	set := make(map[string]struct{}, len(b))
+	for _, v := range b {
+		set[v] = struct{}{}
+	}
+	var diff []string
+	for _, v := range a {
+		if _, ok := set[v]; !ok {
+			diff = append(diff, v)
+		}
+	}
+	return diff
+}
+
 func recordToRow(r *record.Record) (*storage.Row, error) {
 	data, err := json.Marshal(map[string]any{
 		"spec":   r.Spec,
@@ -249,12 +325,14 @@ func recordToRow(r *record.Record) (*storage.Row, error) {
 		tradespace = "default"
 	}
 	return &storage.Row{
-		Type:            r.TypeMeta.GVK().Type(),
-		Tradespace:      tradespace,
-		Name:            r.ObjectMeta.Name,
-		Labels:          r.ObjectMeta.Labels,
-		Data:            string(data),
-		ResourceVersion: r.ObjectMeta.ResourceVersion,
+		Type:              r.TypeMeta.GVK().Type(),
+		Tradespace:        tradespace,
+		Name:              r.ObjectMeta.Name,
+		Labels:            r.ObjectMeta.Labels,
+		Data:              string(data),
+		ResourceVersion:   r.ObjectMeta.ResourceVersion,
+		Finalizers:        r.ObjectMeta.Finalizers,
+		DeletionTimestamp: r.ObjectMeta.DeletionTimestamp,
 	}, nil
 }
 
@@ -272,12 +350,14 @@ func rowToRecord(row *storage.Row) (*record.Record, error) {
 	return &record.Record{
 		TypeMeta: record.TypeMetaFromType(row.Type),
 		ObjectMeta: record.ObjectMeta{
-			Tradespace:      row.Tradespace,
-			Name:            row.Name,
-			Labels:          row.Labels,
-			ResourceVersion: row.ResourceVersion,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
+			Tradespace:        row.Tradespace,
+			Name:              row.Name,
+			Labels:            row.Labels,
+			ResourceVersion:   row.ResourceVersion,
+			CreatedAt:         row.CreatedAt,
+			UpdatedAt:         row.UpdatedAt,
+			Finalizers:        row.Finalizers,
+			DeletionTimestamp: row.DeletionTimestamp,
 		},
 		Spec:   data.Spec,
 		Status: data.Status,
