@@ -104,10 +104,8 @@ func (s *RowStorage) Get(ctx context.Context, key storage.Key) (*storage.Row, er
 	if err := json.Unmarshal(labelsJSON, &row.Labels); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal labels: %w", err)
 	}
-	if len(finalizersJSON) > 0 {
-		if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
-		}
+	if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
 	}
 
 	return row, nil
@@ -247,10 +245,8 @@ func (s *RowStorage) List(ctx context.Context, q storage.Query) ([]*storage.Row,
 		if err := json.Unmarshal(labelsJSON, &row.Labels); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal labels: %w", err)
 		}
-		if len(finalizersJSON) > 0 {
-			if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
-			}
+		if err := json.Unmarshal(finalizersJSON, &row.Finalizers); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal finalizers: %w", err)
 		}
 
 		results = append(results, row)

@@ -73,10 +73,10 @@ func (s *Storage) migrate(ctx context.Context) error {
 	if _, err := s.db.ExecContext(ctx, schema); err != nil {
 		return err
 	}
-	// Add columns for pre-existing databases (SQLite 3.37+ supports IF NOT EXISTS).
+	// Add columns for pre-existing databases that predate this schema.
 	for _, stmt := range []string{
-		`ALTER TABLE rows ADD COLUMN IF NOT EXISTS finalizers TEXT NOT NULL DEFAULT '[]'`,
-		`ALTER TABLE rows ADD COLUMN IF NOT EXISTS deletion_timestamp TEXT`,
+		`ALTER TABLE rows ADD COLUMN finalizers TEXT NOT NULL DEFAULT '[]'`,
+		`ALTER TABLE rows ADD COLUMN deletion_timestamp TEXT`,
 	} {
 		if _, err := s.db.ExecContext(ctx, stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			return err
@@ -291,7 +291,7 @@ func buildRow(typ, tradespace, name string, labelsJSON, data sql.NullString, res
 	}
 
 	var finalizers []string
-	if finalizersJSON.Valid && finalizersJSON.String != "" {
+	if finalizersJSON.Valid {
 		json.Unmarshal([]byte(finalizersJSON.String), &finalizers)
 	}
 

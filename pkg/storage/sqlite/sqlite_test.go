@@ -113,10 +113,13 @@ func TestUpdate(t *testing.T) {
 		Name:       "item1",
 		Data:       `{"count":1}`,
 	}
-	s.Create(ctx, r)
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
 
-	r.Data = `{"count":2}`
-	updated, err := s.Update(ctx, r)
+	created.Data = `{"count":2}`
+	updated, err := s.Update(ctx, created)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
