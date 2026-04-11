@@ -1,3 +1,6 @@
+// Package redis provides a Redis-backed StreamStorage implementation using
+// Redis TimeSeries commands (TS.ADD, TS.GET, TS.RANGE). It is used for
+// storing and querying high-frequency timeseries data such as price feeds.
 package redis
 
 import (

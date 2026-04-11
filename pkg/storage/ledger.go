@@ -1,4 +1,6 @@
-// Package storage defines the storage interfaces.
+// Package storage defines the ledger storage interface.
+// LedgerStorage manages an append-only log of approved fund allocations,
+// providing atomic balance checks to prevent overdrafts across tradespaces.
 package storage
 
 import (

@@ -1,3 +1,4 @@
+// Package sqlite provides a SQLite LedgerStorage implementation.
 package sqlite
 
 import (

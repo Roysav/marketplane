@@ -1,3 +1,6 @@
+// Package service provides the StreamService business logic layer for managing
+// timeseries streams defined by StreamDefinition records. It validates incoming
+// data against the stream's JSON Schema before forwarding to StreamStorage.
 package service
 
 import (
@@ -24,9 +27,9 @@ type StreamKey struct {
 	Name string
 }
 
-// String returns the full key as group/version/kind/name.
+// String returns the full key as its name.
 func (k StreamKey) String() string {
-	return fmt.Sprintf("%s", k.Name)
+	return k.Name
 }
 
 // StreamDefinitionSpec represents the spec of a StreamDefinition record.

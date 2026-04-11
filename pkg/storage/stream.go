@@ -1,3 +1,7 @@
+// Package storage defines the storage interfaces for timeseries data.
+// StreamStorage provides append, query, and watch operations backed by
+// Redis TimeSeries. It is used for real-time market data such as price
+// feeds, order book snapshots, and other high-frequency series.
 package storage
 
 import (

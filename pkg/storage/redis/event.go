@@ -1,3 +1,6 @@
+// Package redis provides a Redis-backed EventStorage implementation using
+// Redis Streams (XADD, XREAD). It delivers ordered, durable publish/subscribe
+// messaging for record change events consumed by controllers and watchers.
 package redis
 
 import (

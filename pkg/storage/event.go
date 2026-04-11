@@ -1,3 +1,6 @@
+// Package storage defines the event storage interface for publish/subscribe
+// messaging. EventStorage is backed by Redis Streams and provides durable,
+// ordered delivery of record change events to subscribers.
 package storage
 
 import "context"

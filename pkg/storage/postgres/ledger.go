@@ -1,3 +1,4 @@
+// Package postgres provides a PostgreSQL LedgerStorage implementation.
 package postgres
 
 import (
