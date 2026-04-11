@@ -22,7 +22,7 @@ Module: `github.com/roysav/marketplane`
 ```
 
 **Storage types:**
-- **Row** (PostgreSQL/SQLite) - persistent storage for records
+- **Row** (PostgreSQL) - persistent storage for records
 - **Stream** (Redis Streams) - real-time timeseries data (JSON values)
 - **Event** (Redis Streams) - message queue for change events
 
@@ -102,9 +102,10 @@ pkg/
 │   ├── storage.go         # RowStorage interface (Row type)
 │   ├── stream.go          # StreamStorage interface (timeseries)
 │   ├── event.go           # EventStorage interface (message queue)
-│   ├── sqlite/
-│   │   ├── sqlite.go      # SQLite RowStorage implementation
-│   │   └── sqlite_test.go
+│   ├── postgres/
+│   │   ├── postgres.go    # PostgreSQL RowStorage implementation
+│   │   ├── ledger.go      # PostgreSQL LedgerStorage implementation
+│   │   └── migrate.go     # Schema migrations
 │   └── redis/
 │       ├── redis.go       # Redis client setup
 │       ├── stream.go      # Redis TimeSeries implementation
@@ -178,7 +179,6 @@ docker-compose up -d  # Start Redis Stack
 
 ## Tech Stack
 - Go 1.22+
-- SQLite (modernc.org/sqlite - pure Go)
 - Redis Stack (Streams for timeseries and events)
 - gojsonschema (JSON Schema validation)
 - postgres

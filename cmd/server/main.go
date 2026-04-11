@@ -15,7 +15,6 @@ import (
 	"github.com/roysav/marketplane/pkg/authz"
 	"github.com/roysav/marketplane/pkg/storage"
 	"github.com/roysav/marketplane/pkg/storage/postgres"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -27,7 +26,7 @@ import (
 func main() {
 	var (
 		port      = flag.Int("port", 50051, "gRPC server port")
-		dbPath    = flag.String("db", "marketplane.db", "SQLite database path (use :memory: for in-memory)")
+		dbPath    = flag.String("db", "", "PostgreSQL DSN (e.g. postgres://user:pass@host/db?sslmode=disable)")
 		redisAddr = flag.String("redis", "localhost:6379", "Redis address")
 		debug     = flag.Bool("debug", false, "Enable debug logging")
 
@@ -56,19 +55,18 @@ func main() {
 	defer cancel()
 
 	// Initialize storage
+	if *dbPath == "" {
+		logger.Error("PostgreSQL DSN is required; provide -db postgres://...")
+		os.Exit(1)
+	}
 	logger.Info("initializing storage", "db", *dbPath, "redis", *redisAddr)
 
 	var rows storage.RowStorage
 	var ledger storage.LedgerStorage
 	var rowsErr, ledgerErr error
 
-	if strings.HasPrefix(*dbPath, "postgres://") {
-		rows, rowsErr = postgres.New(ctx, *dbPath)
-		ledger, ledgerErr = postgres.NewLedgerStorage(ctx, *dbPath)
-	} else {
-		rows, rowsErr = sqlite.New(ctx, *dbPath)
-		ledger, ledgerErr = sqlite.NewLedgerStorage(ctx, *dbPath)
-	}
+	rows, rowsErr = postgres.New(ctx, *dbPath)
+	ledger, ledgerErr = postgres.NewLedgerStorage(ctx, *dbPath)
 
 	if rowsErr != nil {
 		logger.Error("failed to initialize row storage", "error", rowsErr)

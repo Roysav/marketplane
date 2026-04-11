@@ -245,6 +245,11 @@ func (s *LedgerStorage) Close() error {
 	return s.db.Close()
 }
 
+// DB returns the underlying *sql.DB. Intended for test helpers.
+func (s *LedgerStorage) DB() *sql.DB {
+	return s.db
+}
+
 // advisoryLockKey generates a consistent int64 key for pg_advisory_lock
 // based on tradespace and currency.
 func advisoryLockKey(tradespace, currency string) int64 {

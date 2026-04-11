@@ -9,18 +9,19 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 
 	"github.com/roysav/marketplane/pkg/storage"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/redis"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
 
 func newTestStreamService(t *testing.T) (*StreamService, *goredis.Client) {
 	t.Helper()
 	ctx := context.Background()
 
-	rows, err := sqlite.New(ctx, ":memory:")
+	rows, err := postgres.New(ctx, testDSN)
 	if err != nil {
-		t.Fatalf("failed to create sqlite storage: %v", err)
+		t.Skipf("PostgreSQL not available: %v", err)
 	}
+	rows.DB().ExecContext(ctx, "TRUNCATE records CASCADE")
 	t.Cleanup(func() { rows.Close() })
 
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})

@@ -260,6 +260,11 @@ func (s *RowStorage) Close() error {
 	return s.db.Close()
 }
 
+// DB returns the underlying *sql.DB. Intended for test helpers.
+func (s *RowStorage) DB() *sql.DB {
+	return s.db
+}
+
 func isUniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "duplicate key")
 }
