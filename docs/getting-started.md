@@ -202,4 +202,4 @@ Any `Create`, `Update`, or `Delete` on `polymarket/v1/Order` records will be str
 go test ./... -v
 ```
 
-Integration tests that require Redis or PostgreSQL are skipped automatically when those services are unavailable.
+Some integration tests require Redis and/or PostgreSQL to be running. If those services are unavailable, `go test ./... -v` may fail rather than skip those tests automatically.
