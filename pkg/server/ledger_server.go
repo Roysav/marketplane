@@ -48,6 +48,14 @@ func (s *LedgerServer) Register(grpcServer *grpc.Server) {
 	pb.RegisterLedgerServiceServer(grpcServer, s)
 }
 
+func (s *LedgerServer) requireRowStorage() error {
+	if s.rows == nil {
+		s.logger.Error("row storage is not configured")
+		return status.Error(codes.Internal, "row storage is not configured")
+	}
+	return nil
+}
+
 // Append atomically checks balance and inserts a ledger entry.
 func (s *LedgerServer) Append(ctx context.Context, req *pb.LedgerAppendRequest) (*pb.LedgerAppendResponse, error) {
 	if req.Tradespace == "" {
@@ -58,6 +66,9 @@ func (s *LedgerServer) Append(ctx context.Context, req *pb.LedgerAppendRequest) 
 	}
 	if err := s.authorizer.AuthorizeLedger(ctx, authz.VerbAppend, req.Tradespace); err != nil {
 		return nil, toGRPCError(err)
+	}
+	if err := s.requireRowStorage(); err != nil {
+		return nil, err
 	}
 
 	allocation, err := s.loadAllocation(ctx, req.Tradespace, req.AllocationName)
