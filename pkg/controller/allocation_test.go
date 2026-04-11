@@ -129,7 +129,7 @@ func TestAllocationController_ApproveDeposit(t *testing.T) {
 			Name:       "alloc-deposit-001",
 		})
 		if err != nil {
-			t.Fatalf("failed to get allocation: %v", err)
+			continue
 		}
 
 		if getResp.Record.Status != nil {
@@ -222,7 +222,7 @@ func TestAllocationController_RejectInsufficientBalance(t *testing.T) {
 			Name:       "alloc-order-001",
 		})
 		if err != nil {
-			t.Fatalf("failed to get allocation: %v", err)
+			continue
 		}
 
 		if getResp.Record.Status != nil {
@@ -299,11 +299,14 @@ func TestAllocationController_FullFlow(t *testing.T) {
 
 		for i := 0; i < 50; i++ {
 			time.Sleep(100 * time.Millisecond)
-			getResp, _ := records.Get(ctx, &pb.GetRequest{
+			getResp, err := records.Get(ctx, &pb.GetRequest{
 				Type:       "core/v1/Allocation",
 				Tradespace: "test-ns",
 				Name:       name,
 			})
+			if err != nil {
+				continue
+			}
 			if getResp.Record.Status != nil {
 				if phase, ok := getResp.Record.Status.Fields["phase"]; ok {
 					if phase.GetStringValue() != "" {
@@ -361,7 +364,10 @@ func TestAllocationController_FullFlow(t *testing.T) {
 	}
 
 	// Verify final ledger state
-	listResp, _ := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	listResp, err := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	if err != nil {
+		t.Fatalf("failed to list ledger: %v", err)
+	}
 	if len(listResp.Entries) != 3 {
 		t.Errorf("expected 3 ledger entries, got %d", len(listResp.Entries))
 	}
@@ -453,7 +459,10 @@ func TestAllocationController_InitialSync(t *testing.T) {
 	}
 
 	// Verify ledger has both entries
-	listResp, _ := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	listResp, err := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	if err != nil {
+		t.Fatalf("failed to list ledger: %v", err)
+	}
 	if len(listResp.Entries) != 2 {
 		t.Errorf("expected 2 ledger entries, got %d", len(listResp.Entries))
 	}
@@ -506,11 +515,14 @@ func TestAllocationController_PeriodicResync(t *testing.T) {
 	for i := 0; i < 30; i++ {
 		time.Sleep(100 * time.Millisecond)
 
-		getResp, _ := records.Get(ctx, &pb.GetRequest{
+		getResp, err := records.Get(ctx, &pb.GetRequest{
 			Type:       "core/v1/Allocation",
 			Tradespace: "test-ns",
 			Name:       "sync-deposit",
 		})
+		if err != nil {
+			continue
+		}
 
 		if getResp.Record.Status != nil {
 			if phase, ok := getResp.Record.Status.Fields["phase"]; ok {
@@ -597,7 +609,10 @@ func TestAllocationController_SyncMultipleTradespaces(t *testing.T) {
 		}
 
 		// Verify ledger entry exists in each tradespace
-		listResp, _ := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: ts})
+		listResp, err := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: ts})
+		if err != nil {
+			t.Fatalf("failed to list ledger for tradespace %s: %v", ts, err)
+		}
 		if len(listResp.Entries) != 1 {
 			t.Errorf("tradespace %s: expected 1 ledger entry, got %d", ts, len(listResp.Entries))
 		}
