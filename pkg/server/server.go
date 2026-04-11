@@ -251,6 +251,7 @@ func pbToRecord(pbRec *pb.Record) (*record.Record, error) {
 			Labels:          pbRec.ObjectMeta.GetLabels(),
 			Annotations:     pbRec.ObjectMeta.GetAnnotations(),
 			ResourceVersion: pbRec.ObjectMeta.GetResourceVersion(),
+			Finalizers:      pbRec.ObjectMeta.GetFinalizers(),
 		},
 		Spec:   spec,
 		Status: status,
@@ -274,23 +275,29 @@ func recordToPB(r *record.Record) (*pb.Record, error) {
 		}
 	}
 
+	objectMeta := &pb.ObjectMeta{
+		Name:            r.ObjectMeta.Name,
+		Tradespace:      r.ObjectMeta.Tradespace,
+		Labels:          r.ObjectMeta.Labels,
+		Annotations:     r.ObjectMeta.Annotations,
+		ResourceVersion: r.ObjectMeta.ResourceVersion,
+		CreatedAt:       timestamppb.New(r.ObjectMeta.CreatedAt),
+		UpdatedAt:       timestamppb.New(r.ObjectMeta.UpdatedAt),
+		Finalizers:      r.ObjectMeta.Finalizers,
+	}
+	if r.ObjectMeta.DeletionTimestamp != nil {
+		objectMeta.DeletionTimestamp = timestamppb.New(*r.ObjectMeta.DeletionTimestamp)
+	}
+
 	return &pb.Record{
 		TypeMeta: &pb.TypeMeta{
 			Group:   r.TypeMeta.Group,
 			Version: r.TypeMeta.Version,
 			Kind:    r.TypeMeta.Kind,
 		},
-		ObjectMeta: &pb.ObjectMeta{
-			Name:            r.ObjectMeta.Name,
-			Tradespace:      r.ObjectMeta.Tradespace,
-			Labels:          r.ObjectMeta.Labels,
-			Annotations:     r.ObjectMeta.Annotations,
-			ResourceVersion: r.ObjectMeta.ResourceVersion,
-			CreatedAt:       timestamppb.New(r.ObjectMeta.CreatedAt),
-			UpdatedAt:       timestamppb.New(r.ObjectMeta.UpdatedAt),
-		},
-		Spec:   spec,
-		Status: status,
+		ObjectMeta: objectMeta,
+		Spec:       spec,
+		Status:     status,
 	}, nil
 }
 
