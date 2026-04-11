@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"github.com/roysav/marketplane/pkg/storage/redis"
 	"log/slog"
 	"os"
 	"testing"
@@ -27,9 +28,16 @@ func newTestService(t *testing.T) *Service {
 	// Use a discarding logger for tests
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
+	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})
+	defer redisClient.Close()
+	if err != nil {
+		t.Skipf("Redis not available")
+	}
+	events := redis.NewEventStorage(redisClient)
+
 	return New(Config{
 		Rows:   rows,
-		Events: nil, // no events for basic tests
+		Events: events,
 		Logger: logger,
 	})
 }

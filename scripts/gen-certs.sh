@@ -21,7 +21,7 @@
 #           -key    certs/client.key \
 #           localhost:50051 list
 
-set -euo pipefail
+set -euo
 
 OUT="${1:-certs}"
 mkdir -p "$OUT"
