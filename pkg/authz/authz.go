@@ -19,9 +19,10 @@ import (
 )
 
 const (
-	ResourceAll         = "*"
-	ResourceLedgerEntry = "ledger:entry"
-	ResourceRecordPrefx = "record:"
+	ResourceAll          = "*"
+	ResourceLedgerEntry  = "ledger:entry"
+	ResourceRecordPrefix = "record:"
+	ResourceRecordPrefx  = ResourceRecordPrefix
 
 	VerbGet            = "get"
 	VerbList           = "list"
