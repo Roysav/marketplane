@@ -404,8 +404,7 @@ func TestService_UpdateCannotAddFinalizersToTerminating(t *testing.T) {
 		},
 		Spec: map[string]any{},
 	}
-	created, err := svc.Create(ctx, r)
-	if err != nil {
+	if _, err := svc.Create(ctx, r); err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
@@ -419,7 +418,6 @@ func TestService_UpdateCannotAddFinalizersToTerminating(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
-	_ = created
 
 	// Attempt to add a new finalizer — must be rejected.
 	terminating.ObjectMeta.Finalizers = append(terminating.ObjectMeta.Finalizers, "new.example.com")
