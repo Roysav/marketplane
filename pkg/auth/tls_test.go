@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/roysav/marketplane/pkg/auth"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 )
@@ -225,12 +224,15 @@ func TestFromContext_Empty(t *testing.T) {
 // echoServer is a minimal gRPC server used for interceptor integration tests.
 // We test via the auth interceptors by building a real TLS connection.
 
-func TestIdentityExtracted_mTLS(t *testing.T) {
+// TestMTLSHandshake verifies that when the server is configured for mTLS the
+// TLS handshake completes and the server presents the expected certificate.
+// Identity extraction through the interceptor is covered by TestFromContext_WithPeerInfo.
+func TestMTLSHandshake(t *testing.T) {
 	ca := selfSignedCA(t)
 	srvLeaf := signedLeaf(t, ca, "server", []string{"localhost"}, true)
 	clientLeaf := signedLeaf(t, ca, "alice", nil, false)
 
-	// Build server TLS config (mTLS)
+	// Build server TLS config (mTLS).
 	serverTLS := &tls.Config{
 		Certificates: []tls.Certificate{srvLeaf.tlsCert},
 		ClientCAs:    ca.certPool,
@@ -238,7 +240,7 @@ func TestIdentityExtracted_mTLS(t *testing.T) {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	// Build client TLS config
+	// Build client TLS config.
 	clientTLS := &tls.Config{
 		Certificates: []tls.Certificate{clientLeaf.tlsCert},
 		RootCAs:      ca.certPool,
@@ -246,46 +248,27 @@ func TestIdentityExtracted_mTLS(t *testing.T) {
 		MinVersion:   tls.VersionTLS12,
 	}
 
-	// Channel to capture extracted identity.
-	identityCh := make(chan *auth.Identity, 1)
-
-	// Start a gRPC server with the interceptor.
-	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	lis, err := tls.Listen("tcp", "127.0.0.1:0", serverTLS)
 	if err != nil {
 		t.Fatalf("listen: %v", err)
 	}
 
-	grpcSrv := grpc.NewServer(
-		grpc.Creds(credentials.NewTLS(serverTLS)),
-		grpc.UnaryInterceptor(func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
-			id, _ := auth.FromContext(ctx)
-			identityCh <- id
-			return handler(ctx, req)
-		}),
-	)
+	// Accept one connection and let the handshake complete before closing.
+	go func() {
+		conn, err := lis.Accept()
+		if err == nil {
+			_ = conn.(*tls.Conn).Handshake()
+			conn.Close()
+		}
+	}()
 
-	go func() { _ = grpcSrv.Serve(lis) }()
-	t.Cleanup(grpcSrv.Stop)
-
-	// Dial from client.
-	conn, err := grpc.NewClient(
-		lis.Addr().String(),
-		grpc.WithTransportCredentials(credentials.NewTLS(clientTLS)),
-	)
-	if err != nil {
-		t.Fatalf("dial: %v", err)
-	}
-	defer conn.Close()
-
-	// Trigger a peer info lookup by fetching peer info through a raw TLS dial
-	// (gRPC doesn't expose unregistered RPCs, so we validate via the TLS layer).
 	tlsConn, err := tls.Dial("tcp", lis.Addr().String(), clientTLS)
 	if err != nil {
 		t.Fatalf("tls dial: %v", err)
 	}
 	defer tlsConn.Close()
 
-	// Verify the server presented the right cert.
+	// Verify the server presented the right certificate.
 	serverCerts := tlsConn.ConnectionState().PeerCertificates
 	if len(serverCerts) == 0 {
 		t.Fatal("no server certificates in TLS handshake")
