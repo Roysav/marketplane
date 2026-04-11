@@ -1,0 +1,63 @@
+name: Test
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis/redis-stack-server:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: marketplane
+          POSTGRES_PASSWORD: marketplane
+          POSTGRES_DB: marketplane
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U marketplane"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests with coverage
+        run: go test ./... -coverprofile=coverage.out -covermode=atomic
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.out
+          fail_ci_if_error: false
+
+      - name: Generate coverage summary
+        if: github.event_name == 'pull_request'
+        uses: vladopajic/go-test-coverage@v2
+        with:
+          profile: coverage.out
+          local-prefix: github.com/roysav/marketplane
+          threshold-file: 0
+          threshold-package: 0
+          threshold-total: 0
