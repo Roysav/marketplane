@@ -167,6 +167,18 @@ func (s *Server) Watch(req *WatchRequest, stream grpc.ServerStreamingServer[Watc
 				if err == nil {
 					pbRec, _ = recordToPB(r)
 				}
+			} else {
+				pbRec = &pb.Record{
+					TypeMeta: &pb.TypeMeta{
+						Group:   record.TypeMetaFromType(eventData.Type).Group,
+						Version: record.TypeMetaFromType(eventData.Type).Version,
+						Kind:    record.TypeMetaFromType(eventData.Type).Kind,
+					},
+					ObjectMeta: &pb.ObjectMeta{
+						Name:       eventData.Name,
+						Tradespace: eventData.Tradespace,
+					},
+				}
 			}
 
 			if err := stream.Send(&WatchEvent{
@@ -273,6 +285,9 @@ func toGRPCError(err error) error {
 	}
 	if errors.Is(err, service.ErrAlreadyExists) {
 		return status.Error(codes.AlreadyExists, err.Error())
+	}
+	if errors.Is(err, service.ErrImmutable) {
+		return status.Error(codes.FailedPrecondition, err.Error())
 	}
 	if errors.Is(err, service.ErrValidation) {
 		return status.Error(codes.InvalidArgument, err.Error())

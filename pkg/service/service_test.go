@@ -250,6 +250,122 @@ func TestService_GetNotFound(t *testing.T) {
 	}
 }
 
+func TestService_CreateCustomTypeFromMetaRecord(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	_, err := svc.Create(ctx, &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "MetaRecord"},
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "default",
+			Name:       "CryptoSubscription.polymarket",
+		},
+		Spec: map[string]any{
+			"group":   "polymarket",
+			"version": "v1",
+			"kind":    "CryptoSubscription",
+			"scope":   "global",
+			"schema": map[string]any{
+				"type":     "object",
+				"required": []any{"venue", "symbol"},
+				"properties": map[string]any{
+					"venue":   map[string]any{"type": "string"},
+					"symbol":  map[string]any{"type": "string"},
+					"enabled": map[string]any{"type": "boolean"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create MetaRecord through service: %v", err)
+	}
+
+	created, err := svc.Create(ctx, &record.Record{
+		TypeMeta: record.TypeMeta{Group: "polymarket", Version: "v1", Kind: "CryptoSubscription"},
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "default",
+			Name:       "polymarket.crypto.binance.btcusdt",
+		},
+		Spec: map[string]any{
+			"venue":   "binance",
+			"symbol":  "btcusdt",
+			"enabled": true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create custom record through service: %v", err)
+	}
+
+	if created.ObjectMeta.Name != "polymarket.crypto.binance.btcusdt" {
+		t.Fatalf("unexpected custom record name: %s", created.ObjectMeta.Name)
+	}
+}
+
+func TestService_MetaRecordIsImmutable(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	meta, err := svc.Create(ctx, &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "MetaRecord"},
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "default",
+			Name:       "Thing.example",
+		},
+		Spec: map[string]any{
+			"group":   "example",
+			"version": "v1",
+			"kind":    "Thing",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create MetaRecord: %v", err)
+	}
+
+	meta.Spec["scope"] = "global"
+	_, err = svc.Update(ctx, meta)
+	if !errors.Is(err, ErrImmutable) {
+		t.Fatalf("expected ErrImmutable on MetaRecord update, got %v", err)
+	}
+
+	err = svc.Delete(ctx, "core/v1/MetaRecord", "default", "Thing.example")
+	if !errors.Is(err, ErrImmutable) {
+		t.Fatalf("expected ErrImmutable on MetaRecord delete, got %v", err)
+	}
+}
+
+func TestService_StreamDefinitionIsImmutable(t *testing.T) {
+	svc := newTestService(t)
+	ctx := context.Background()
+
+	def, err := svc.Create(ctx, &record.Record{
+		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "StreamDefinition"},
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "default",
+			Name:       "prices.example",
+		},
+		Spec: map[string]any{
+			"group":     "example",
+			"version":   "v1",
+			"kind":      "Price",
+			"retention": "24h",
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create StreamDefinition: %v", err)
+	}
+
+	def.Spec["retention"] = "48h"
+	_, err = svc.Update(ctx, def)
+	if !errors.Is(err, ErrImmutable) {
+		t.Fatalf("expected ErrImmutable on StreamDefinition update, got %v", err)
+	}
+
+	err = svc.Delete(ctx, "core/v1/StreamDefinition", "default", "prices.example")
+	if !errors.Is(err, ErrImmutable) {
+		t.Fatalf("expected ErrImmutable on StreamDefinition delete, got %v", err)
+	}
+}
+
 var counter int
 
 func randomSuffix() string {

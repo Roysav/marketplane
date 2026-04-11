@@ -1,0 +1,199 @@
+{
+  "records": [
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "MetaRecord" },
+      "objectMeta": { "name": "CryptoSubscription.polymarket", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoSubscription",
+        "scope": "global",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol"],
+          "properties": {
+            "venue": { "type": "string", "enum": ["binance", "chainlink"] },
+            "symbol": { "type": "string" },
+            "enabled": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.binance.btcusdt", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.binance.ethusdt", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.binance.solusdt", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.binance.xrpusdt", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.chainlink.btc_usd", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.chainlink.eth_usd", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.chainlink.sol_usd", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "typeMeta": { "group": "core", "version": "v1", "kind": "StreamDefinition" },
+      "objectMeta": { "name": "polymarket.crypto.chainlink.xrp_usd", "tradespace": "default" },
+      "spec": {
+        "group": "polymarket",
+        "version": "v1",
+        "kind": "CryptoPrice",
+        "scope": "global",
+        "retention": "24h",
+        "schema": {
+          "type": "object",
+          "required": ["venue", "symbol", "value", "source_timestamp_ms", "message_timestamp_ms"],
+          "properties": {
+            "venue": { "type": "string" },
+            "symbol": { "type": "string" },
+            "value": { "type": "number" },
+            "source_timestamp_ms": { "type": "number" },
+            "message_timestamp_ms": { "type": "number" }
+          }
+        }
+      }
+    }
+  ]
+}

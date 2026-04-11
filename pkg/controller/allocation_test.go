@@ -33,9 +33,15 @@ func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClie
 	}
 
 	// Connect to Redis for events (required for Watch)
-	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})
+	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379", DB: 10})
 	if err != nil {
 		t.Skipf("Redis not available, skipping integration test: %v", err)
+	}
+	if err := redisClient.FlushDB(ctx).Err(); err != nil {
+		rows.Close()
+		ledger.Close()
+		redisClient.Close()
+		t.Fatalf("failed to clear redis state: %v", err)
 	}
 	events := redis.NewEventStorage(redisClient)
 

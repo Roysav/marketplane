@@ -169,6 +169,12 @@ func toStreamGRPCError(err error) error {
 	if errors.Is(err, service.ErrStreamNotFound) {
 		return status.Error(codes.NotFound, err.Error())
 	}
+	if errors.Is(err, service.ErrStreamEmpty) {
+		return status.Error(codes.NotFound, err.Error())
+	}
+	if errors.Is(err, service.ErrStreamsDisabled) {
+		return status.Error(codes.FailedPrecondition, err.Error())
+	}
 	if errors.Is(err, service.ErrStreamValidation) {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}

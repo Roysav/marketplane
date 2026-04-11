@@ -9,11 +9,14 @@ import (
 func TestEventStorage(t *testing.T) {
 	ctx := context.Background()
 
-	client, err := NewClient(ctx, Options{Addr: "localhost:6379"})
+	client, err := NewClient(ctx, Options{Addr: "localhost:6379", DB: 12})
 	if err != nil {
 		t.Fatalf("failed to connect to redis: %v", err)
 	}
 	defer client.Close()
+	if err := client.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("failed to clear redis state: %v", err)
+	}
 
 	// Clean up test stream
 	client.Del(ctx, "events:test/topic")
@@ -63,11 +66,14 @@ func TestEventStorageSubscribe(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	client, err := NewClient(ctx, Options{Addr: "localhost:6379"})
+	client, err := NewClient(ctx, Options{Addr: "localhost:6379", DB: 12})
 	if err != nil {
 		t.Fatalf("failed to connect to redis: %v", err)
 	}
 	defer client.Close()
+	if err := client.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("failed to clear redis state: %v", err)
+	}
 
 	// Use a unique topic
 	topic := "test/live-" + time.Now().Format("150405")

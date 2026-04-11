@@ -37,6 +37,9 @@ func New(ctx context.Context, dsn string) (*Storage, error) {
 	if _, err := db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
 		return nil, err
 	}
+	if _, err := db.ExecContext(ctx, "PRAGMA busy_timeout = 5000"); err != nil {
+		return nil, err
+	}
 	if dsn != ":memory:" {
 		if _, err := db.ExecContext(ctx, "PRAGMA journal_mode = WAL"); err != nil {
 			return nil, err

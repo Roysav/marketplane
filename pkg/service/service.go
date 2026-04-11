@@ -19,6 +19,7 @@ var (
 	ErrAlreadyExists = errors.New("record already exists")
 	ErrValidation    = errors.New("validation failed")
 	ErrInvalidScope  = errors.New("invalid scope")
+	ErrImmutable     = errors.New("record is immutable")
 )
 
 // Config holds configuration for the Service.
@@ -103,6 +104,10 @@ func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*r
 
 // Update updates an existing record.
 func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record, error) {
+	if isImmutableDefinitionType(r.TypeMeta.GVK().Type()) {
+		return nil, fmt.Errorf("%w: %s", ErrImmutable, r.TypeMeta.GVK().Type())
+	}
+
 	// Validate the record
 	if err := s.validator.Validate(ctx, r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
@@ -131,6 +136,10 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 
 // Delete removes a record.
 func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) error {
+	if isImmutableDefinitionType(typeStr) {
+		return fmt.Errorf("%w: %s", ErrImmutable, typeStr)
+	}
+
 	err := s.rows.Delete(ctx, storage.Key{
 		Type:       typeStr,
 		Tradespace: tradespace,
@@ -290,4 +299,8 @@ func isAlreadyExists(err error) bool {
 	}
 	return errors.Is(err, storage.ErrAlreadyExists) ||
 		strings.Contains(err.Error(), "already exists")
+}
+
+func isImmutableDefinitionType(typeStr string) bool {
+	return typeStr == "core/v1/MetaRecord" || typeStr == "core/v1/StreamDefinition"
 }

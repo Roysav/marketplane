@@ -16,7 +16,9 @@ import (
 
 var (
 	ErrStreamNotFound   = errors.New("stream definition not found")
+	ErrStreamEmpty      = errors.New("stream has no entries")
 	ErrStreamValidation = errors.New("stream data validation failed")
+	ErrStreamsDisabled  = errors.New("stream storage not configured")
 )
 
 // StreamKey uniquely identifies a stream.
@@ -64,6 +66,10 @@ func NewStreamService(cfg StreamServiceConfig) *StreamService {
 
 // Append adds a data point to the stream.
 func (s *StreamService) Append(ctx context.Context, key StreamKey, ts time.Time, data map[string]any) error {
+	if err := s.requireStreams(); err != nil {
+		return err
+	}
+
 	def, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return err
@@ -90,6 +96,10 @@ func (s *StreamService) Append(ctx context.Context, key StreamKey, ts time.Time,
 
 // Latest gets the most recent entry from the stream.
 func (s *StreamService) Latest(ctx context.Context, key StreamKey) (*storage.StreamEntry, error) {
+	if err := s.requireStreams(); err != nil {
+		return nil, err
+	}
+
 	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
@@ -101,7 +111,7 @@ func (s *StreamService) Latest(ctx context.Context, key StreamKey) (*storage.Str
 	entry, err := s.streams.Latest(ctx, streamKey)
 	if err != nil {
 		if isStreamNotFound(err) {
-			return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
+			return nil, fmt.Errorf("%w: %s", ErrStreamEmpty, key.String())
 		}
 		return nil, err
 	}
@@ -110,6 +120,10 @@ func (s *StreamService) Latest(ctx context.Context, key StreamKey) (*storage.Str
 
 // Range gets entries within a time range.
 func (s *StreamService) Range(ctx context.Context, key StreamKey, from, to time.Time) ([]*storage.StreamEntry, error) {
+	if err := s.requireStreams(); err != nil {
+		return nil, err
+	}
+
 	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
@@ -123,6 +137,10 @@ func (s *StreamService) Range(ctx context.Context, key StreamKey, from, to time.
 
 // Watch subscribes to new entries on the stream.
 func (s *StreamService) Watch(ctx context.Context, key StreamKey) (<-chan storage.WatchEvent, error) {
+	if err := s.requireStreams(); err != nil {
+		return nil, err
+	}
+
 	_, err := s.getDefinition(ctx, key)
 	if err != nil {
 		return nil, err
@@ -149,11 +167,18 @@ func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*Stre
 	}
 
 	var spec StreamDefinitionSpec
-	if err := json.Unmarshal([]byte(row.Data), &spec); err != nil {
+	if err := storage.DecodeRowSpec(row, &spec); err != nil {
 		return nil, fmt.Errorf("invalid stream definition data: %w", err)
 	}
 
 	return &spec, nil
+}
+
+func (s *StreamService) requireStreams() error {
+	if s.streams == nil {
+		return ErrStreamsDisabled
+	}
+	return nil
 }
 
 // validateData validates data against a JSON schema.

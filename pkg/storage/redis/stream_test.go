@@ -9,11 +9,14 @@ import (
 func TestStreamStorage(t *testing.T) {
 	ctx := context.Background()
 
-	client, err := NewClient(ctx, Options{Addr: "localhost:6379"})
+	client, err := NewClient(ctx, Options{Addr: "localhost:6379", DB: 12})
 	if err != nil {
 		t.Fatalf("failed to connect to redis: %v", err)
 	}
 	defer client.Close()
+	if err := client.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("failed to clear redis state: %v", err)
+	}
 
 	// Clean up test keys
 	client.Del(ctx, "stream:test/ticker")
@@ -98,11 +101,14 @@ func TestStreamStorageWatch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	client, err := NewClient(ctx, Options{Addr: "localhost:6379"})
+	client, err := NewClient(ctx, Options{Addr: "localhost:6379", DB: 12})
 	if err != nil {
 		t.Fatalf("failed to connect to redis: %v", err)
 	}
 	defer client.Close()
+	if err := client.FlushDB(ctx).Err(); err != nil {
+		t.Fatalf("failed to clear redis state: %v", err)
+	}
 
 	client.Del(ctx, "stream:test/watch")
 

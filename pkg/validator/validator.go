@@ -3,7 +3,6 @@ package validator
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -144,8 +143,8 @@ func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
 	}
 
 	// Parse the MetaRecord data
-	var data map[string]any
-	if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
+	data, err := storage.DecodeRowSpecMap(row)
+	if err != nil {
 		return fmt.Errorf("invalid MetaRecord data: %w", err)
 	}
 
@@ -206,8 +205,8 @@ func (v *Validator) GetScope(ctx context.Context, typeStr string) (Scope, error)
 	}
 
 	// Parse the MetaRecord data
-	var data map[string]any
-	if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
+	data, err := storage.DecodeRowSpecMap(row)
+	if err != nil {
 		return "", fmt.Errorf("invalid MetaRecord data: %w", err)
 	}
 
