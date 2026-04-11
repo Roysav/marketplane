@@ -68,5 +68,5 @@ echo "  go run ./cmd/server -cert $OUT/server.crt -key $OUT/server.key -ca $OUT/
 echo ""
 echo "Create the matching core/v1/User record (after server is running):"
 echo '  grpcurl -cacert '"$OUT"'/ca.crt -cert '"$OUT"'/client.crt -key '"$OUT"'/client.key \'
-echo '    -d '"'"'{"record":{"type_meta":{"group":"core","version":"v1","kind":"User"},"object_meta":{"name":"alice"},"spec":{"commonName":"alice"}}}'"'"' \'
+echo '    -d '"'"'{"record":{"type_meta":{"group":"core","version":"v1","kind":"User"},"object_meta":{"name":"alice","tradespace":"default-tradespace"},"spec":{"commonName":"alice"}}}'"'"' \'
 echo '    localhost:50051 marketplane.RecordService/Create'
