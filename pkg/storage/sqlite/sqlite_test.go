@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/roysav/marketplane/pkg/storage"
 )
@@ -229,6 +230,209 @@ func TestList_ByTradespace(t *testing.T) {
 	}
 	if records[0].Name != "a" {
 		t.Errorf("Expected record 'a', got %s", records[0].Name)
+	}
+}
+
+func TestCreate_WithFinalizers(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-with-finalizers",
+		Finalizers: []string{"cleanup.example.com", "billing.example.com"},
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if len(created.Finalizers) != 2 {
+		t.Errorf("expected 2 finalizers, got %d", len(created.Finalizers))
+	}
+
+	// Verify round-trip via Get.
+	got, err := s.Get(ctx, r.Key())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(got.Finalizers) != 2 {
+		t.Errorf("expected 2 finalizers after round-trip, got %d: %v", len(got.Finalizers), got.Finalizers)
+	}
+	finalizerSet := make(map[string]bool)
+	for _, f := range got.Finalizers {
+		finalizerSet[f] = true
+	}
+	for _, want := range r.Finalizers {
+		if !finalizerSet[want] {
+			t.Errorf("missing finalizer %q after round-trip", want)
+		}
+	}
+	if got.DeletionTimestamp != nil {
+		t.Error("DeletionTimestamp should be nil for a fresh record")
+	}
+}
+
+func TestCreate_WithEmptyFinalizers(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-no-finalizers",
+		Finalizers: nil,
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if len(created.Finalizers) != 0 {
+		t.Errorf("expected no finalizers, got: %v", created.Finalizers)
+	}
+
+	got, err := s.Get(ctx, r.Key())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(got.Finalizers) != 0 {
+		t.Errorf("expected no finalizers after round-trip, got: %v", got.Finalizers)
+	}
+}
+
+func TestUpdate_AddFinalizers(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-add-finalizers",
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	created.Finalizers = []string{"a.example.com", "b.example.com"}
+	updated, err := s.Update(ctx, created)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if len(updated.Finalizers) != 2 {
+		t.Errorf("expected 2 finalizers, got %d: %v", len(updated.Finalizers), updated.Finalizers)
+	}
+
+	got, err := s.Get(ctx, r.Key())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(got.Finalizers) != 2 {
+		t.Errorf("expected 2 finalizers in storage, got %d", len(got.Finalizers))
+	}
+}
+
+func TestUpdate_RemoveFinalizers(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-remove-finalizers",
+		Finalizers: []string{"x.example.com", "y.example.com"},
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// Remove all finalizers.
+	created.Finalizers = nil
+	updated, err := s.Update(ctx, created)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if len(updated.Finalizers) != 0 {
+		t.Errorf("expected no finalizers after removal, got: %v", updated.Finalizers)
+	}
+
+	got, err := s.Get(ctx, r.Key())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if len(got.Finalizers) != 0 {
+		t.Errorf("expected no finalizers in storage after removal, got: %v", got.Finalizers)
+	}
+}
+
+func TestUpdate_SetDeletionTimestamp(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-deletion-ts",
+		Finalizers: []string{"cleanup.example.com"},
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+	if created.DeletionTimestamp != nil {
+		t.Error("DeletionTimestamp should be nil initially")
+	}
+
+	// Set DeletionTimestamp.
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	created.DeletionTimestamp = &now
+	updated, err := s.Update(ctx, created)
+	if err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+	if updated.DeletionTimestamp == nil {
+		t.Fatal("expected DeletionTimestamp to be set after update")
+	}
+
+	// Round-trip via Get.
+	got, err := s.Get(ctx, r.Key())
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+	if got.DeletionTimestamp == nil {
+		t.Fatal("DeletionTimestamp must be persisted in storage")
+	}
+}
+
+func TestUpdate_FinalizersWithConflict(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	r := &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item-conflict",
+		Finalizers: []string{"a.example.com"},
+	}
+	created, err := s.Create(ctx, r)
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	// First update bumps ResourceVersion to 2.
+	firstCopy := *created
+	firstCopy.Data = `{"v":1}`
+	if _, err := s.Update(ctx, &firstCopy); err != nil {
+		t.Fatalf("first Update failed: %v", err)
+	}
+
+	// Second update with the stale ResourceVersion (1) must fail.
+	staleCopy := *created // ResourceVersion still 1
+	staleCopy.Finalizers = nil
+	_, err = s.Update(ctx, &staleCopy)
+	if err == nil {
+		t.Error("expected conflict error on stale ResourceVersion, got nil")
 	}
 }
 
