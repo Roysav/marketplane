@@ -40,3 +40,6 @@ config.local.yaml
 
 # Build
 dist/
+
+coverage
+certs
