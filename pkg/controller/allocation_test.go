@@ -34,7 +34,10 @@ func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClie
 	if err != nil {
 		t.Skipf("PostgreSQL not available: %v", err)
 	}
-	ledger.DB().ExecContext(ctx, "TRUNCATE ledger CASCADE")
+	_, err = ledger.DB().ExecContext(ctx, "TRUNCATE ledger CASCADE")
+	if err != nil {
+		t.Fatalf("%e", err)
+	}
 
 	// Connect to Redis for events (required for Watch)
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})
