@@ -11,6 +11,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/roysav/marketplane/pkg/auth"
 	"github.com/roysav/marketplane/pkg/storage"
 	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/sqlite"
@@ -28,6 +29,14 @@ func main() {
 		dbPath    = flag.String("db", "marketplane.db", "SQLite database path (use :memory: for in-memory)")
 		redisAddr = flag.String("redis", "localhost:6379", "Redis address")
 		debug     = flag.Bool("debug", false, "Enable debug logging")
+
+		// TLS flags — when cert+key are provided the server uses TLS.
+		// When ca is also provided it enables mutual TLS: clients must present
+		// a certificate signed by the given CA. The client cert's CN is mapped
+		// to a core/v1/User record name for identity propagation.
+		tlsCert = flag.String("cert", "", "Path to PEM-encoded server certificate (enables TLS)")
+		tlsKey  = flag.String("key", "", "Path to PEM-encoded server private key (enables TLS)")
+		tlsCA   = flag.String("ca", "", "Path to PEM-encoded CA certificate (enables mTLS client auth)")
 	)
 	flag.Parse()
 
@@ -93,8 +102,31 @@ func main() {
 		Logger:  logger,
 	})
 
-	// Initialize gRPC server
-	grpcServer := grpc.NewServer()
+	// Initialize gRPC server — optionally with TLS/mTLS credentials and
+	// interceptors that inject the caller's TLS identity into the context.
+	var grpcOpts []grpc.ServerOption
+
+	if *tlsCert != "" && *tlsKey != "" {
+		creds, err := auth.ServerCredentials(*tlsCert, *tlsKey, *tlsCA)
+		if err != nil {
+			logger.Error("failed to load TLS credentials", "error", err)
+			os.Exit(1)
+		}
+		grpcOpts = append(grpcOpts,
+			grpc.Creds(creds),
+			grpc.UnaryInterceptor(auth.UnaryInterceptor),
+			grpc.StreamInterceptor(auth.StreamInterceptor),
+		)
+		if *tlsCA != "" {
+			logger.Info("mTLS enabled", "ca", *tlsCA)
+		} else {
+			logger.Info("TLS enabled (server-only, no client auth)")
+		}
+	} else {
+		logger.Warn("TLS disabled — running in plaintext mode (use -cert/-key/-ca for production)")
+	}
+
+	grpcServer := grpc.NewServer(grpcOpts...)
 	srv := server.New(svc, logger)
 	srv.Register(grpcServer)
 

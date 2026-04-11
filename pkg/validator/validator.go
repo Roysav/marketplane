@@ -79,6 +79,19 @@ var coreSchemas = map[string]map[string]any{
 			"targetName": map[string]any{"type": "string"}, // name of the target record
 		},
 	},
+	// core/v1/User represents an authenticated identity mapped to a TLS client certificate CN.
+	"core/v1/User": {
+		"type":     "object",
+		"required": []any{"commonName"},
+		"properties": map[string]any{
+			"commonName":  map[string]any{"type": "string"},  // must match TLS client cert Subject.CN
+			"description": map[string]any{"type": "string"},
+			"roles": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+			},
+		},
+	},
 }
 
 // coreScopes defines the scope for built-in types.
@@ -88,6 +101,7 @@ var coreScopes = map[string]Scope{
 	"core/v1/Tradespace":       ScopeGlobal,     // Tradespaces themselves are global
 	"core/v1/Quota":            ScopeTradespace, // Quotas are per-tradespace
 	"core/v1/Allocation":       ScopeTradespace, // Allocations are per-tradespace
+	"core/v1/User":             ScopeGlobal,     // Users are cluster-wide identities
 }
 
 // compiledCoreSchemas holds pre-compiled schemas for core types.
