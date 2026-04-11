@@ -188,6 +188,13 @@ func (s *RowStorage) List(ctx context.Context, q storage.Query) ([]*storage.Row,
 		argNum++
 	}
 
+	// Optional name filter
+	if q.Name != "" {
+		conditions = append(conditions, fmt.Sprintf("name = $%d", argNum))
+		args = append(args, q.Name)
+		argNum++
+	}
+
 	// Optional label filters using JSONB containment
 	if len(q.Labels) > 0 {
 		labelsJSON, _ := json.Marshal(q.Labels)

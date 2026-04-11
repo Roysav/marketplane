@@ -115,10 +115,11 @@ func main() {
 			logger.Error("failed to load TLS credentials", "error", err)
 			os.Exit(1)
 		}
+		mw := auth.NewMiddleware(rows)
 		grpcOpts = append(grpcOpts,
 			grpc.Creds(creds),
-			grpc.UnaryInterceptor(auth.NewMiddleware(rows).UnaryInterceptor),
-			grpc.StreamInterceptor(auth.NewMiddleware(rows).StreamInterceptor),
+			grpc.UnaryInterceptor(mw.UnaryInterceptor),
+			grpc.StreamInterceptor(mw.StreamInterceptor),
 		)
 		if *tlsCA != "" {
 			logger.Info("mTLS enabled", "ca", *tlsCA)

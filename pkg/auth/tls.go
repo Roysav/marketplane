@@ -158,28 +158,30 @@ func (m *Middleware) StreamInterceptor(
 	return handler(srv, &wrappedStream{ServerStream: ss, ctx: ctx})
 }
 
-// authenticate injects the TLS identity into ctx and, when a CN is present,
-// verifies that a matching core/v1/User record exists in storage.
+// authenticate injects the TLS identity into ctx and, when a client certificate
+// identity is present, verifies that its CN maps to a core/v1/User record.
 func (m *Middleware) authenticate(ctx context.Context) (context.Context, error) {
 	ctx = withIdentity(ctx)
 	id, ok := FromContext(ctx)
-	if !ok || id.CommonName == "" {
-		// No client certificate presented (server-only TLS or no TLS); pass through.
+	if !ok {
+		// No client certificate identity extracted (server-only TLS or no TLS); pass through.
 		return ctx, nil
+	}
+	if id.CommonName == "" {
+		return ctx, status.Error(codes.Unauthenticated, "auth: client certificate common name is required")
 	}
 
 	rows, err := m.rows.List(ctx, storage.Query{
 		Type: "core/v1/User",
+		Name: id.CommonName,
 		// Empty Tradespace searches across all tradespaces.
 	})
 	if err != nil {
 		return ctx, status.Errorf(codes.Internal, "auth: failed to look up user %q: %v", id.CommonName, err)
 	}
 
-	for _, row := range rows {
-		if row.Name == id.CommonName {
-			return ctx, nil
-		}
+	if len(rows) > 0 {
+		return ctx, nil
 	}
 
 	return ctx, status.Errorf(codes.Unauthenticated, "auth: user %q not found", id.CommonName)

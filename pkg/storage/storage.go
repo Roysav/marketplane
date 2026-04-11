@@ -45,6 +45,7 @@ func (r *Row) Key() Key {
 type Query struct {
 	Type       string            // required, e.g. "core/v1/Tradespace"
 	Tradespace string            // optional
+	Name       string            // optional; when set only rows with this name are returned
 	Labels     map[string]string // optional
 	Limit      int
 }

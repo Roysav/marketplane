@@ -172,6 +172,11 @@ func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Row, er
 		args = append(args, q.Tradespace)
 	}
 
+	if q.Name != "" {
+		query += " AND name = ?"
+		args = append(args, q.Name)
+	}
+
 	for k, v := range q.Labels {
 		query += " AND json_extract(labels, ?) = ?"
 		args = append(args, "$."+k, v)

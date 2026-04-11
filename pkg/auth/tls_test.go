@@ -18,8 +18,12 @@ import (
 
 	"github.com/roysav/marketplane/pkg/auth"
 	"github.com/roysav/marketplane/pkg/storage"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
 )
 
 // ----------------------------------------------------------------------------
@@ -408,6 +412,9 @@ func TestMiddleware_UnaryInterceptor_UserNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected Unauthenticated error, got nil")
 	}
+	if code := status.Code(err); code != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", code)
+	}
 }
 
 func TestMiddleware_UnaryInterceptor_NoClientCert(t *testing.T) {
@@ -429,5 +436,99 @@ func TestMiddleware_UnaryInterceptor_NoClientCert(t *testing.T) {
 	}
 	if !called {
 		t.Error("handler was not called")
+	}
+}
+
+func TestMiddleware_UnaryInterceptor_EmptyCN(t *testing.T) {
+	rows := &stubRowStorage{}
+	mw := auth.NewMiddleware(rows)
+
+	// Build a peer context where the cert has an empty CN.
+	ca := selfSignedCA(t)
+	leaf := signedLeaf(t, ca, "" /* empty CN */, []string{"san-only.example.com"}, false)
+	tlsState := tls.ConnectionState{
+		PeerCertificates: []*x509.Certificate{leaf.cert},
+		VerifiedChains:   [][]*x509.Certificate{{leaf.cert, ca.cert}},
+	}
+	p := &peer.Peer{AuthInfo: credentials.TLSInfo{State: tlsState}}
+	ctx := peer.NewContext(context.Background(), p)
+
+	handler := func(ctx context.Context, _ any) (any, error) {
+		t.Error("handler should not be called when CN is empty")
+		return nil, nil
+	}
+
+	_, err := mw.UnaryInterceptor(ctx, nil, nil, handler)
+	if err == nil {
+		t.Fatal("expected Unauthenticated error for empty CN, got nil")
+	}
+	if code := status.Code(err); code != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", code)
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Middleware — StreamInterceptor
+// ----------------------------------------------------------------------------
+
+// mockServerStream is a minimal grpc.ServerStream for testing.
+type mockServerStream struct {
+	grpc.ServerStream
+	ctx context.Context
+}
+
+func (m *mockServerStream) Context() context.Context     { return m.ctx }
+func (m *mockServerStream) SendMsg(_ any) error           { return nil }
+func (m *mockServerStream) RecvMsg(_ any) error           { return nil }
+func (m *mockServerStream) SetHeader(_ metadata.MD) error  { return nil }
+func (m *mockServerStream) SendHeader(_ metadata.MD) error { return nil }
+func (m *mockServerStream) SetTrailer(_ metadata.MD)       {}
+
+func TestMiddleware_StreamInterceptor_UserExists(t *testing.T) {
+	rows := &stubRowStorage{users: []string{"alice"}}
+	mw := auth.NewMiddleware(rows)
+
+	ctx := peerCtxWithCN(t, "alice")
+	stream := &mockServerStream{ctx: ctx}
+
+	called := false
+	handler := func(_ any, ss grpc.ServerStream) error {
+		called = true
+		id, ok := auth.FromContext(ss.Context())
+		if !ok {
+			t.Error("expected identity in stream context")
+		} else if id.CommonName != "alice" {
+			t.Errorf("CommonName = %q, want %q", id.CommonName, "alice")
+		}
+		return nil
+	}
+
+	err := mw.StreamInterceptor(nil, stream, nil, handler)
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("handler was not called")
+	}
+}
+
+func TestMiddleware_StreamInterceptor_UserNotFound(t *testing.T) {
+	rows := &stubRowStorage{users: []string{"bob"}}
+	mw := auth.NewMiddleware(rows)
+
+	ctx := peerCtxWithCN(t, "alice")
+	stream := &mockServerStream{ctx: ctx}
+
+	handler := func(_ any, ss grpc.ServerStream) error {
+		t.Error("handler should not be called when user is not found")
+		return nil
+	}
+
+	err := mw.StreamInterceptor(nil, stream, nil, handler)
+	if err == nil {
+		t.Fatal("expected Unauthenticated error, got nil")
+	}
+	if code := status.Code(err); code != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", code)
 	}
 }
