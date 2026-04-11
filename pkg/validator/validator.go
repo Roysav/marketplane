@@ -84,12 +84,8 @@ var coreSchemas = map[string]map[string]any{
 		"type":     "object",
 		"required": []any{"commonName"},
 		"properties": map[string]any{
-			"commonName":  map[string]any{"type": "string"},  // must match TLS client cert Subject.CN
+			"commonName":  map[string]any{"type": "string"}, // must match TLS client cert Subject.CN
 			"description": map[string]any{"type": "string"},
-			"roles": map[string]any{
-				"type":  "array",
-				"items": map[string]any{"type": "string"},
-			},
 		},
 	},
 }
