@@ -76,6 +76,8 @@ func (s *Storage) migrate(ctx context.Context) error {
 	// Add columns for pre-existing databases.
 	// modernc.org/sqlite does not support "ADD COLUMN IF NOT EXISTS", so we attempt
 	// the ALTER and ignore "duplicate column" / "already exists" errors.
+	// modernc.org/sqlite returns "duplicate column name: <col>" for this condition;
+	// we match case-insensitively to be robust across driver versions.
 	for _, stmt := range []string{
 		`ALTER TABLE rows ADD COLUMN finalizers TEXT NOT NULL DEFAULT '[]'`,
 		`ALTER TABLE rows ADD COLUMN deletion_timestamp TEXT`,
