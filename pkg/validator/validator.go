@@ -97,7 +97,7 @@ var coreScopes = map[string]Scope{
 	"core/v1/Tradespace":       ScopeGlobal,     // Tradespaces themselves are global
 	"core/v1/Quota":            ScopeTradespace, // Quotas are per-tradespace
 	"core/v1/Allocation":       ScopeTradespace, // Allocations are per-tradespace
-	"core/v1/User":             ScopeGlobal,     // Users are cluster-wide identities
+	"core/v1/User":             ScopeTradespace, // Users are namespaced within a tradespace
 }
 
 // compiledCoreSchemas holds pre-compiled schemas for core types.

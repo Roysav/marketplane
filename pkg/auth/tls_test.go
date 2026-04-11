@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/roysav/marketplane/pkg/auth"
+	"github.com/roysav/marketplane/pkg/storage"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
@@ -332,4 +333,117 @@ func TestFromContext_WithPeerInfo(t *testing.T) {
 	if gotID.CommonName != "bob" {
 		t.Errorf("CommonName = %q, want %q", gotID.CommonName, "bob")
 	}
+}
+
+// ----------------------------------------------------------------------------
+// Middleware — user record existence validation
+// ----------------------------------------------------------------------------
+
+// stubRowStorage is a minimal storage.RowStorage for testing Middleware.
+type stubRowStorage struct {
+users []string // user names (CNs) that "exist"
+}
+
+func (s *stubRowStorage) Create(_ context.Context, r *storage.Row) (*storage.Row, error) {
+return r, nil
+}
+func (s *stubRowStorage) Get(_ context.Context, _ storage.Key) (*storage.Row, error) {
+return nil, storage.ErrNotFound
+}
+func (s *stubRowStorage) Update(_ context.Context, r *storage.Row) (*storage.Row, error) {
+return r, nil
+}
+func (s *stubRowStorage) Delete(_ context.Context, _ storage.Key) error { return nil }
+func (s *stubRowStorage) List(_ context.Context, q storage.Query) ([]*storage.Row, error) {
+if q.Type != "core/v1/User" {
+return nil, nil
+}
+rows := make([]*storage.Row, 0, len(s.users))
+for _, name := range s.users {
+rows = append(rows, &storage.Row{
+Type:       "core/v1/User",
+Tradespace: "my-tradespace",
+Name:       name,
+})
+}
+return rows, nil
+}
+func (s *stubRowStorage) Close() error { return nil }
+
+func peerCtxWithCN(t *testing.T, cn string) context.Context {
+t.Helper()
+ca := selfSignedCA(t)
+leaf := signedLeaf(t, ca, cn, nil, false)
+tlsState := tls.ConnectionState{
+PeerCertificates: []*x509.Certificate{leaf.cert},
+VerifiedChains:   [][]*x509.Certificate{{leaf.cert, ca.cert}},
+}
+p := &peer.Peer{AuthInfo: credentials.TLSInfo{State: tlsState}}
+return peer.NewContext(context.Background(), p)
+}
+
+func TestMiddleware_UnaryInterceptor_UserExists(t *testing.T) {
+rows := &stubRowStorage{users: []string{"alice"}}
+mw := auth.NewMiddleware(rows)
+
+ctx := peerCtxWithCN(t, "alice")
+
+called := false
+handler := func(ctx context.Context, _ any) (any, error) {
+called = true
+id, ok := auth.FromContext(ctx)
+if !ok {
+t.Error("expected identity in context")
+} else if id.CommonName != "alice" {
+t.Errorf("CommonName = %q, want %q", id.CommonName, "alice")
+}
+return nil, nil
+}
+
+_, err := mw.UnaryInterceptor(ctx, nil, nil, handler)
+if err != nil {
+t.Errorf("unexpected error: %v", err)
+}
+if !called {
+t.Error("handler was not called")
+}
+}
+
+func TestMiddleware_UnaryInterceptor_UserNotFound(t *testing.T) {
+rows := &stubRowStorage{users: []string{"bob"}}
+mw := auth.NewMiddleware(rows)
+
+ctx := peerCtxWithCN(t, "alice")
+
+handler := func(ctx context.Context, _ any) (any, error) {
+t.Error("handler should not be called when user is not found")
+return nil, nil
+}
+
+_, err := mw.UnaryInterceptor(ctx, nil, nil, handler)
+if err == nil {
+t.Fatal("expected Unauthenticated error, got nil")
+}
+}
+
+func TestMiddleware_UnaryInterceptor_NoClientCert(t *testing.T) {
+rows := &stubRowStorage{}
+mw := auth.NewMiddleware(rows)
+
+// Context without any peer info (no TLS cert).
+ctx := context.Background()
+
+called := false
+handler := func(ctx context.Context, _ any) (any, error) {
+called = true
+return nil, nil
+}
+
+_, err := mw.UnaryInterceptor(ctx, nil, nil, handler)
+if err != nil {
+t.Errorf("unexpected error: %v", err)
+}
+if !called {
+t.Error("handler was not called")
+}
 }

@@ -277,18 +277,18 @@ func TestValidateScope_User(t *testing.T) {
 		wantErr    bool
 	}{
 		{
-			name:       "global scope - empty tradespace",
-			tradespace: "",
-			wantErr:    false,
-		},
-		{
-			name:       "global scope - default tradespace",
-			tradespace: "default",
-			wantErr:    false,
-		},
-		{
-			name:       "global scope - non-default tradespace rejected",
+			name:       "tradespace scope - specific tradespace accepted",
 			tradespace: "my-tradespace",
+			wantErr:    false,
+		},
+		{
+			name:       "tradespace scope - empty tradespace rejected",
+			tradespace: "",
+			wantErr:    true,
+		},
+		{
+			name:       "tradespace scope - default tradespace rejected",
+			tradespace: "default",
 			wantErr:    true,
 		},
 	}

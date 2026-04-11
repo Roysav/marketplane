@@ -114,8 +114,8 @@ func main() {
 		}
 		grpcOpts = append(grpcOpts,
 			grpc.Creds(creds),
-			grpc.UnaryInterceptor(auth.UnaryInterceptor),
-			grpc.StreamInterceptor(auth.StreamInterceptor),
+			grpc.UnaryInterceptor(auth.NewMiddleware(rows).UnaryInterceptor),
+			grpc.StreamInterceptor(auth.NewMiddleware(rows).StreamInterceptor),
 		)
 		if *tlsCA != "" {
 			logger.Info("mTLS enabled", "ca", *tlsCA)

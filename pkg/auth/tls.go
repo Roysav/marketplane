@@ -6,8 +6,8 @@
 //     present a certificate signed by that CA (mutual TLS / mTLS).
 //   - The Common Name (CN) of the verified client certificate becomes the
 //     caller's identity and is injected into the request context.
-//   - A core/v1/User record with a matching commonName can carry additional
-//     metadata (description) for the authenticated user.
+//   - A core/v1/User record with a matching name (CN) must exist in storage;
+//     users are namespaced within a tradespace.
 package auth
 
 import (
@@ -18,8 +18,12 @@ import (
 	"os"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
+	"google.golang.org/grpc/status"
+
+	"github.com/roysav/marketplane/pkg/storage"
 )
 
 // contextKey is an unexported type for context keys in this package.
@@ -90,6 +94,7 @@ func ServerCredentials(certFile, keyFile, caFile string) (credentials.TransportC
 
 // UnaryInterceptor is a gRPC unary server interceptor that extracts the caller's
 // TLS identity and injects it into the request context.
+// It does not validate user record existence; use Middleware.UnaryInterceptor for that.
 func UnaryInterceptor(
 	ctx context.Context,
 	req any,
@@ -101,6 +106,7 @@ func UnaryInterceptor(
 
 // StreamInterceptor is a gRPC streaming server interceptor that extracts the
 // caller's TLS identity and injects it into the stream context.
+// It does not validate user record existence; use Middleware.StreamInterceptor for that.
 func StreamInterceptor(
 	srv any,
 	ss grpc.ServerStream,
@@ -108,6 +114,75 @@ func StreamInterceptor(
 	handler grpc.StreamHandler,
 ) error {
 	return handler(srv, &wrappedStream{ServerStream: ss, ctx: withIdentity(ss.Context())})
+}
+
+// Middleware validates the caller's TLS identity against stored core/v1/User records.
+// When a client certificate is presented, the CN must match the Name of an existing
+// core/v1/User record in any tradespace.
+type Middleware struct {
+	rows storage.RowStorage
+}
+
+// NewMiddleware returns a Middleware backed by the given RowStorage.
+func NewMiddleware(rows storage.RowStorage) *Middleware {
+	return &Middleware{rows: rows}
+}
+
+// UnaryInterceptor extracts the TLS identity, validates that a core/v1/User record
+// with Name equal to the certificate CN exists, then calls the handler.
+func (m *Middleware) UnaryInterceptor(
+	ctx context.Context,
+	req any,
+	_ *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (any, error) {
+	ctx, err := m.authenticate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return handler(ctx, req)
+}
+
+// StreamInterceptor extracts the TLS identity, validates that a core/v1/User record
+// with Name equal to the certificate CN exists, then calls the handler.
+func (m *Middleware) StreamInterceptor(
+	srv any,
+	ss grpc.ServerStream,
+	_ *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
+	ctx, err := m.authenticate(ss.Context())
+	if err != nil {
+		return err
+	}
+	return handler(srv, &wrappedStream{ServerStream: ss, ctx: ctx})
+}
+
+// authenticate injects the TLS identity into ctx and, when a CN is present,
+// verifies that a matching core/v1/User record exists in storage.
+func (m *Middleware) authenticate(ctx context.Context) (context.Context, error) {
+	ctx = withIdentity(ctx)
+	id, ok := FromContext(ctx)
+	if !ok || id.CommonName == "" {
+		// No client certificate presented (server-only TLS or no TLS); pass through.
+		return ctx, nil
+	}
+
+	rows, err := m.rows.List(ctx, storage.Query{
+		Type: "core/v1/User",
+		// Empty Tradespace searches across all tradespaces.
+	})
+	if err != nil {
+		return ctx, status.Errorf(codes.Internal, "auth: failed to look up user %q: %v", id.CommonName, err)
+	}
+
+	for _, row := range rows {
+		if row.Name == id.CommonName {
+			return ctx, nil
+		}
+	}
+
+	return ctx, status.Errorf(codes.Unauthenticated, "auth: user %q not found", id.CommonName)
 }
 
 // withIdentity extracts TLS peer information from ctx and returns a new context
