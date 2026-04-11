@@ -19,12 +19,8 @@ const (
 	AllocationTypeStr = "core/v1/Allocation"
 
 	// Status phases
-	PhasePending  = "Pending"
 	PhaseApproved = "Approved"
 	PhaseRejected = "Rejected"
-
-	// Default sync interval
-	DefaultSyncInterval = 30 * time.Second
 )
 
 // AllocationController reconciles Allocation records by appending to the ledger.

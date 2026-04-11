@@ -37,7 +37,7 @@ func setupPolymarketTestServer(t *testing.T) (pb.RecordServiceClient, pb.StreamS
 		t.Fatalf("failed to create row storage: %v", err)
 	}
 
-	redisClient, err := redisstore.NewClient(ctx, redisstore.Options{Addr: "localhost:6379", DB: 10})
+	redisClient, err := redisstore.NewClient(ctx, redisstore.Options{Addr: "localhost:6379", DB: 13})
 	if err != nil {
 		rows.Close()
 		t.Skipf("Redis not available, skipping integration test: %v", err)

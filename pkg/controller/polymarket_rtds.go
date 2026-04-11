@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -30,6 +31,7 @@ const (
 	DefaultPolymarketPingInterval     = 5 * time.Second
 	DefaultPolymarketReconnectDelay   = 3 * time.Second
 	DefaultPolymarketStatusWriteDelay = 5 * time.Second
+	polymarketDefaultSyncInterval     = 30 * time.Second
 	polymarketDefaultTradespace       = "default"
 	polymarketVenueBinance            = "binance"
 	polymarketVenueChainlink          = "chainlink"
@@ -88,6 +90,7 @@ type PolymarketRTDSController struct {
 	fingerprints        map[string]string
 	desired             map[string]cryptoSubscription
 	workers             map[string]*polymarketVenueWorker
+	statusWriteMu       sync.Mutex
 	lastStatusWrite     map[string]time.Time
 }
 
@@ -105,7 +108,7 @@ func NewPolymarketRTDSController(records pb.RecordServiceClient, streams pb.Stre
 		pingInterval:        DefaultPolymarketPingInterval,
 		reconnectDelay:      DefaultPolymarketReconnectDelay,
 		statusWriteInterval: DefaultPolymarketStatusWriteDelay,
-		syncInterval:        DefaultSyncInterval,
+		syncInterval:        polymarketDefaultSyncInterval,
 		dialer:              websocket.DefaultDialer,
 		now:                 time.Now,
 		fingerprints:        make(map[string]string),
@@ -249,7 +252,7 @@ func (c *PolymarketRTDSController) syncState(ctx context.Context, startup bool) 
 			nextFingerprints[rec.ObjectMeta.GetName()] = fingerprintSubscriptionRecord(rec)
 		}
 
-		sub, prepErr := c.prepareSubscription(ctx, rec, true)
+		sub, prepErr := c.prepareSubscription(ctx, rec, startup)
 		if prepErr != nil {
 			startupErrors = append(startupErrors, prepErr.Error())
 			continue
@@ -259,11 +262,13 @@ func (c *PolymarketRTDSController) syncState(ctx context.Context, startup bool) 
 		}
 	}
 
+	c.statusWriteMu.Lock()
 	for name := range c.lastStatusWrite {
 		if _, ok := nextDesired[name]; !ok {
 			delete(c.lastStatusWrite, name)
 		}
 	}
+	c.statusWriteMu.Unlock()
 
 	if startup && len(startupErrors) > 0 {
 		return fmt.Errorf("startup validation failed: %s", strings.Join(startupErrors, "; "))
@@ -291,7 +296,9 @@ func (c *PolymarketRTDSController) handleWatchEvent(ctx context.Context, event *
 			c.pushVenueUpdates()
 		}
 		delete(c.fingerprints, name)
+		c.statusWriteMu.Lock()
 		delete(c.lastStatusWrite, name)
+		c.statusWriteMu.Unlock()
 		return nil
 	}
 
@@ -308,7 +315,9 @@ func (c *PolymarketRTDSController) handleWatchEvent(ctx context.Context, event *
 	c.fingerprints[name] = fingerprint
 	if sub == nil {
 		delete(c.desired, name)
+		c.statusWriteMu.Lock()
 		delete(c.lastStatusWrite, name)
+		c.statusWriteMu.Unlock()
 	} else {
 		c.desired[name] = *sub
 	}
@@ -318,14 +327,19 @@ func (c *PolymarketRTDSController) handleWatchEvent(ctx context.Context, event *
 }
 
 func (c *PolymarketRTDSController) prepareSubscription(ctx context.Context, rec *pb.Record, startup bool) (*cryptoSubscription, error) {
+	recordName := ""
+	if rec != nil && rec.ObjectMeta != nil {
+		recordName = rec.ObjectMeta.GetName()
+	}
+
 	sub, err := parseCryptoSubscription(rec)
 	if err != nil {
-		if statusErr := c.updateSubscriptionStatus(ctx, rec.ObjectMeta.GetName(), subscriptionStatusMutation{
+		if statusErr := c.updateSubscriptionStatus(ctx, recordName, subscriptionStatusMutation{
 			Phase:      PhaseError,
-			StreamName: rec.ObjectMeta.GetName(),
+			StreamName: recordName,
 			LastError:  stringPtr(err.Error()),
 		}); statusErr != nil {
-			c.logger.Warn("failed to persist invalid subscription status", "name", rec.ObjectMeta.GetName(), "error", statusErr)
+			c.logger.Warn("failed to persist invalid subscription status", "name", recordName, "error", statusErr)
 		}
 		return nil, nil
 	}
@@ -432,7 +446,10 @@ func (c *PolymarketRTDSController) markSubscriptionsError(ctx context.Context, s
 }
 
 func (c *PolymarketRTDSController) maybeMarkSubscriptionMessage(ctx context.Context, sub cryptoSubscription, msgTime time.Time) {
+	c.statusWriteMu.Lock()
 	lastWrite := c.lastStatusWrite[sub.Name]
+	c.statusWriteMu.Unlock()
+
 	if c.statusWriteInterval > 0 && !lastWrite.IsZero() && msgTime.Sub(lastWrite) < c.statusWriteInterval {
 		return
 	}
@@ -447,7 +464,9 @@ func (c *PolymarketRTDSController) maybeMarkSubscriptionMessage(ctx context.Cont
 		return
 	}
 
+	c.statusWriteMu.Lock()
 	c.lastStatusWrite[sub.Name] = msgTime
+	c.statusWriteMu.Unlock()
 }
 
 func (c *PolymarketRTDSController) appendPrice(ctx context.Context, sub cryptoSubscription, msg polymarketRTDSMessage) error {
