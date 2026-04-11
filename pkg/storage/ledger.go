@@ -10,6 +10,7 @@ import (
 var (
 	ErrInsufficientBalance = errors.New("insufficient balance")
 	ErrAlreadyAllocated    = errors.New("target already has an allocation")
+	ErrAllocationApplied   = errors.New("allocation already has a ledger entry")
 )
 
 // LedgerEntry is an approved allocation in the ledger table.
@@ -36,6 +37,9 @@ type LedgerStorage interface {
 
 	// GetByTarget returns entry for a target record.
 	GetByTarget(ctx context.Context, tradespace, targetType, targetName string) (*LedgerEntry, error)
+
+	// GetByAllocation returns entry for an Allocation record.
+	GetByAllocation(ctx context.Context, tradespace, allocationName string) (*LedgerEntry, error)
 
 	// List returns all entries for a tradespace.
 	List(ctx context.Context, tradespace string) ([]*LedgerEntry, error)

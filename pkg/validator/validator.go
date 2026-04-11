@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/shopspring/decimal"
 	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/roysav/marketplane/pkg/record"
@@ -79,13 +80,63 @@ var coreSchemas = map[string]map[string]any{
 			"targetName": map[string]any{"type": "string"}, // name of the target record
 		},
 	},
-	// core/v1/User represents an authenticated identity mapped to a TLS client certificate CN.
 	"core/v1/User": {
-		"type":     "object",
-		"required": []any{"commonName"},
+		"type": "object",
 		"properties": map[string]any{
-			"commonName":  map[string]any{"type": "string"}, // must match TLS client cert Subject.CN
 			"description": map[string]any{"type": "string"},
+			"groups": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+			},
+		},
+	},
+	"core/v1/Role": {
+		"type":     "object",
+		"required": []any{"rules"},
+		"properties": map[string]any{
+			"allTradespaces": map[string]any{"type": "boolean"},
+			"tradespaces": map[string]any{
+				"type":  "array",
+				"items": map[string]any{"type": "string"},
+			},
+			"rules": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":     "object",
+					"required": []any{"resources", "verbs"},
+					"properties": map[string]any{
+						"resources": map[string]any{
+							"type":  "array",
+							"items": map[string]any{"type": "string"},
+						},
+						"verbs": map[string]any{
+							"type":  "array",
+							"items": map[string]any{"type": "string"},
+						},
+					},
+				},
+			},
+		},
+	},
+	"core/v1/RoleBinding": {
+		"type":     "object",
+		"required": []any{"roleRef", "subjects"},
+		"properties": map[string]any{
+			"roleRef": map[string]any{"type": "string"},
+			"subjects": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":     "object",
+					"required": []any{"kind", "name"},
+					"properties": map[string]any{
+						"kind": map[string]any{
+							"type": "string",
+							"enum": []any{"User", "Group"},
+						},
+						"name": map[string]any{"type": "string"},
+					},
+				},
+			},
 		},
 	},
 }
@@ -98,6 +149,8 @@ var coreScopes = map[string]Scope{
 	"core/v1/Quota":            ScopeTradespace, // Quotas are per-tradespace
 	"core/v1/Allocation":       ScopeTradespace, // Allocations are per-tradespace
 	"core/v1/User":             ScopeGlobal,     // Users are cluster-wide identities
+	"core/v1/Role":             ScopeGlobal,     // Roles are cluster-wide RBAC definitions
+	"core/v1/RoleBinding":      ScopeGlobal,     // Role bindings are cluster-wide RBAC bindings
 }
 
 // compiledCoreSchemas holds pre-compiled schemas for core types.
@@ -130,7 +183,13 @@ func (v *Validator) Validate(ctx context.Context, r *record.Record) error {
 
 	// Check core types first
 	if schema, ok := compiledCoreSchemas[typeStr]; ok {
-		return validateWithSchema(schema, r.Spec)
+		if err := validateWithSchema(schema, r.Spec); err != nil {
+			return err
+		}
+		if typeStr == "core/v1/Allocation" {
+			return validateAllocationSpec(r.Spec)
+		}
+		return nil
 	}
 
 	// Look up MetaRecord from storage
@@ -252,6 +311,19 @@ func validateWithSchema(schema *gojsonschema.Schema, spec map[string]any) error 
 			msgs = append(msgs, e.String())
 		}
 		return fmt.Errorf("%w: %s", ErrValidation, strings.Join(msgs, "; "))
+	}
+
+	return nil
+}
+
+func validateAllocationSpec(spec map[string]any) error {
+	amountStr, _ := spec["amount"].(string)
+	amount, err := decimal.NewFromString(amountStr)
+	if err != nil {
+		return fmt.Errorf("%w: invalid amount: %v", ErrValidation, err)
+	}
+	if amount.IsZero() {
+		return fmt.Errorf("%w: amount must be non-zero", ErrValidation)
 	}
 
 	return nil

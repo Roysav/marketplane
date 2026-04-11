@@ -755,7 +755,8 @@ func (x *ListResponse) GetRecords() []*Record {
 // WatchRequest is the request for Watch.
 type WatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"` // record type to watch
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`             // record type to watch
+	Tradespace    string                 `protobuf:"bytes,2,opt,name=tradespace,proto3" json:"tradespace,omitempty"` // optional tradespace filter
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -793,6 +794,13 @@ func (*WatchRequest) Descriptor() ([]byte, []int) {
 func (x *WatchRequest) GetType() string {
 	if x != nil {
 		return x.Type
+	}
+	return ""
+}
+
+func (x *WatchRequest) GetTradespace() string {
+	if x != nil {
+		return x.Tradespace
 	}
 	return ""
 }
@@ -922,9 +930,12 @@ const file_record_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"@\n" +
 	"\fListResponse\x120\n" +
-	"\arecords\x18\x01 \x03(\v2\x16.marketplane.v1.RecordR\arecords\"\"\n" +
+	"\arecords\x18\x01 \x03(\v2\x16.marketplane.v1.RecordR\arecords\"B\n" +
 	"\fWatchRequest\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\"T\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x1e\n" +
+	"\n" +
+	"tradespace\x18\x02 \x01(\tR\n" +
+	"tradespace\"T\n" +
 	"\n" +
 	"WatchEvent\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12.\n" +

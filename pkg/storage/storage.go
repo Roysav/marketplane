@@ -10,6 +10,7 @@ import (
 var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
+	ErrConflict      = errors.New("conflict")
 	ErrTerminating   = errors.New("record is terminating")
 )
 

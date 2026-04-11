@@ -148,6 +148,33 @@ func TestUpdate_NotFound(t *testing.T) {
 	}
 }
 
+func TestUpdate_Conflict(t *testing.T) {
+	s := newTestStorage(t)
+	ctx := context.Background()
+
+	created, err := s.Create(ctx, &storage.Row{
+		Type:       "test/v1/Item",
+		Tradespace: "default",
+		Name:       "item1",
+		Data:       `{"count":1}`,
+	})
+	if err != nil {
+		t.Fatalf("Create failed: %v", err)
+	}
+
+	stale := *created
+	created.Data = `{"count":2}`
+	if _, err := s.Update(ctx, created); err != nil {
+		t.Fatalf("fresh Update failed: %v", err)
+	}
+
+	stale.Data = `{"count":3}`
+	_, err = s.Update(ctx, &stale)
+	if !errors.Is(err, storage.ErrConflict) {
+		t.Fatalf("expected ErrConflict, got: %v", err)
+	}
+}
+
 func TestDelete(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()

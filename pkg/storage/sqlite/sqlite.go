@@ -158,13 +158,18 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, err
 
 	rowsAffected, _ := result.RowsAffected()
 	if rowsAffected == 0 {
-		var exists bool
-		s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM rows WHERE type = ? AND tradespace = ? AND name = ?)`,
-			r.Type, r.Tradespace, r.Name).Scan(&exists)
-		if !exists {
+		var exists int
+		err = s.db.QueryRowContext(ctx, `
+			SELECT 1 FROM rows
+			WHERE type = ? AND tradespace = ? AND name = ?
+		`, r.Type, r.Tradespace, r.Name).Scan(&exists)
+		if err == sql.ErrNoRows {
 			return nil, ErrNotFound
 		}
-		return nil, fmt.Errorf("conflict: resource version mismatch")
+		if err != nil {
+			return nil, fmt.Errorf("failed to check row existence: %w", err)
+		}
+		return nil, storage.ErrConflict
 	}
 
 	return s.Get(ctx, r.Key())

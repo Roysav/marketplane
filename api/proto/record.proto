@@ -112,7 +112,8 @@ message ListResponse {
 
 // WatchRequest is the request for Watch.
 message WatchRequest {
-  string type = 1;  // record type to watch
+  string type = 1;        // record type to watch
+  string tradespace = 2;  // optional tradespace filter
 }
 
 // WatchEvent is a change event streamed by Watch.

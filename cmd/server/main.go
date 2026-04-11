@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/roysav/marketplane/pkg/auth"
+	"github.com/roysav/marketplane/pkg/authz"
 	"github.com/roysav/marketplane/pkg/storage"
 	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/sqlite"
@@ -34,10 +35,12 @@ func main() {
 		// When ca is also provided it enables mutual TLS: clients must present
 		// a certificate signed by the given CA. The client cert's CN is mapped
 		// to a core/v1/User record name for identity propagation.
-		tlsCert   = flag.String("cert", "", "Path to PEM-encoded server certificate (required unless -insecure)")
-		tlsKey    = flag.String("key", "", "Path to PEM-encoded server private key (required unless -insecure)")
-		tlsCA     = flag.String("ca", "", "Path to PEM-encoded CA certificate (enables mTLS client auth)")
-		tlsInsecure = flag.Bool("insecure", false, "Disable TLS and run in plaintext mode (not for production)")
+		tlsCert              = flag.String("cert", "", "Path to PEM-encoded server certificate (required unless -insecure)")
+		tlsKey               = flag.String("key", "", "Path to PEM-encoded server private key (required unless -insecure)")
+		tlsCA                = flag.String("ca", "", "Path to PEM-encoded CA certificate (enables mTLS client auth)")
+		tlsInsecure          = flag.Bool("insecure", false, "Disable TLS and run in plaintext mode (not for production)")
+		rbacEnabled          = flag.Bool("rbac", false, "Enable RBAC authorization")
+		rbacBootstrapAdminCN = flag.String("rbac-bootstrap-admin-cn", "", "Comma-separated client certificate CNs allowed to bootstrap RBAC resources")
 	)
 	flag.Parse()
 
@@ -131,15 +134,25 @@ func main() {
 		logger.Error("TLS credentials are required; provide -cert and -key, or use -insecure to disable TLS (not for production)")
 		os.Exit(1)
 	}
+	if *rbacEnabled && *tlsCA == "" {
+		logger.Error("RBAC requires mutual TLS; provide -ca so client identities can be authenticated")
+		os.Exit(1)
+	}
 
 	grpcServer := grpc.NewServer(grpcOpts...)
-	srv := server.New(svc, logger)
+	authorizer := authz.New(authz.Config{
+		Rows:              rows,
+		Enabled:           *rbacEnabled,
+		BootstrapAdminCNs: splitAndTrim(*rbacBootstrapAdminCN),
+	})
+
+	srv := server.New(svc, authorizer, logger)
 	srv.Register(grpcServer)
 
 	streamSrv := server.NewStreamServer(streamSvc, logger)
 	streamSrv.Register(grpcServer)
 
-	ledgerSrv := server.NewLedgerServer(ledger, logger)
+	ledgerSrv := server.NewLedgerServer(ledger, rows, authorizer, logger)
 	ledgerSrv.Register(grpcServer)
 
 	// Enable reflection for grpcurl/grpcui
@@ -168,4 +181,19 @@ func main() {
 		logger.Error("server error", "error", err)
 		os.Exit(1)
 	}
+}
+
+func splitAndTrim(value string) []string {
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }

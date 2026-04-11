@@ -18,6 +18,7 @@ import (
 var (
 	ErrNotFound      = errors.New("record not found")
 	ErrAlreadyExists = errors.New("record already exists")
+	ErrConflict      = errors.New("record conflict")
 	ErrValidation    = errors.New("validation failed")
 	ErrInvalidScope  = errors.New("invalid scope")
 	ErrTerminating   = errors.New("record is terminating")
@@ -55,6 +56,10 @@ func New(cfg Config) *Service {
 
 // Create creates a new record.
 func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
+	if len(r.Status) > 0 {
+		return nil, fmt.Errorf("%w: status cannot be set on create", ErrValidation)
+	}
+
 	// Validate scope (tradespace vs global)
 	if err := s.validator.ValidateScope(ctx, r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidScope, err)
@@ -134,6 +139,9 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 	if err != nil {
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
+		}
+		if isConflict(err) {
+			return nil, fmt.Errorf("%w: %s/%s", ErrConflict, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
 		}
 		return nil, err
 	}
@@ -370,4 +378,12 @@ func isAlreadyExists(err error) bool {
 	}
 	return errors.Is(err, storage.ErrAlreadyExists) ||
 		strings.Contains(err.Error(), "already exists")
+}
+
+func isConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, storage.ErrConflict) ||
+		strings.Contains(err.Error(), "conflict")
 }

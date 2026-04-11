@@ -145,7 +145,7 @@ func (s *RowStorage) Update(ctx context.Context, r *storage.Row) (*storage.Row, 
 			if !exists {
 				return nil, storage.ErrNotFound
 			}
-			return nil, fmt.Errorf("conflict: resource version mismatch")
+			return nil, storage.ErrConflict
 		}
 		return nil, fmt.Errorf("failed to update record: %w", err)
 	}

@@ -88,6 +88,31 @@ func ServerCredentials(certFile, keyFile, caFile string) (credentials.TransportC
 	return credentials.NewTLS(tlsCfg), nil
 }
 
+// ClientCredentials returns gRPC TransportCredentials for a TLS client using mTLS.
+func ClientCredentials(certFile, keyFile, caFile, serverName string) (credentials.TransportCredentials, error) {
+	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("auth: load client cert/key: %w", err)
+	}
+
+	caPEM, err := os.ReadFile(caFile)
+	if err != nil {
+		return nil, fmt.Errorf("auth: read CA cert %q: %w", caFile, err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(caPEM) {
+		return nil, fmt.Errorf("auth: failed to parse CA cert %q", caFile)
+	}
+
+	cfg := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      pool,
+		MinVersion:   tls.VersionTLS12,
+		ServerName:   serverName,
+	}
+	return credentials.NewTLS(cfg), nil
+}
+
 // UnaryInterceptor is a gRPC unary server interceptor that extracts the caller's
 // TLS identity and injects it into the request context.
 func UnaryInterceptor(

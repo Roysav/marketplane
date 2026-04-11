@@ -47,8 +47,8 @@ func setupTestServer(t *testing.T) (pb.RecordServiceClient, pb.LedgerServiceClie
 
 	// Create gRPC server
 	grpcServer := grpc.NewServer()
-	server.New(svc, nil).Register(grpcServer)
-	server.NewLedgerServer(ledger, nil).Register(grpcServer)
+	server.New(svc, nil, nil).Register(grpcServer)
+	server.NewLedgerServer(ledger, rows, nil, nil).Register(grpcServer)
 
 	// Start server on random port
 	lis, err := net.Listen("tcp", "localhost:0")
@@ -541,6 +541,80 @@ func TestAllocationController_PeriodicResync(t *testing.T) {
 	phase := finalRecord.Status.Fields["phase"].GetStringValue()
 	if phase != PhaseApproved {
 		t.Errorf("expected phase %s, got %s", PhaseApproved, phase)
+	}
+}
+
+func TestAllocationController_AdoptsExistingLedgerEntry(t *testing.T) {
+	records, ledger, cleanup := setupTestServer(t)
+	defer cleanup()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	spec, _ := structpb.NewStruct(map[string]any{
+		"currency":   "USD",
+		"amount":     "250.00",
+		"targetType": "core/v1/Deposit",
+		"targetName": "deposit-adopt",
+	})
+	_, err := records.Create(ctx, &pb.CreateRequest{
+		Record: &pb.Record{
+			TypeMeta: &pb.TypeMeta{
+				Group:   "core",
+				Version: "v1",
+				Kind:    "Allocation",
+			},
+			ObjectMeta: &pb.ObjectMeta{
+				Name:       "alloc-adopt",
+				Tradespace: "test-ns",
+			},
+			Spec: spec,
+		},
+	})
+	if err != nil {
+		t.Fatalf("failed to create allocation: %v", err)
+	}
+
+	_, err = ledger.Append(ctx, &pb.LedgerAppendRequest{
+		Tradespace:     "test-ns",
+		Currency:       "USD",
+		Amount:         "250.00",
+		AllocationName: "alloc-adopt",
+		TargetType:     "core/v1/Deposit",
+		TargetName:     "deposit-adopt",
+	})
+	if err != nil {
+		t.Fatalf("failed to append direct ledger entry: %v", err)
+	}
+
+	ctrl := NewAllocationController(records, ledger, nil)
+	ctrlCtx, ctrlCancel := context.WithCancel(ctx)
+	defer ctrlCancel()
+
+	go ctrl.Run(ctrlCtx)
+	time.Sleep(500 * time.Millisecond)
+
+	getResp, err := records.Get(ctx, &pb.GetRequest{
+		Type:       "core/v1/Allocation",
+		Tradespace: "test-ns",
+		Name:       "alloc-adopt",
+	})
+	if err != nil {
+		t.Fatalf("failed to get adopted allocation: %v", err)
+	}
+	if getResp.Record.Status == nil {
+		t.Fatal("expected allocation status to be populated")
+	}
+	if phase := getResp.Record.Status.Fields["phase"].GetStringValue(); phase != PhaseApproved {
+		t.Fatalf("expected allocation to be approved after adoption, got %s", phase)
+	}
+
+	listResp, err := ledger.List(ctx, &pb.LedgerListRequest{Tradespace: "test-ns"})
+	if err != nil {
+		t.Fatalf("failed to list ledger: %v", err)
+	}
+	if len(listResp.Entries) != 1 {
+		t.Fatalf("expected exactly 1 ledger entry after adoption, got %d", len(listResp.Entries))
 	}
 }
 

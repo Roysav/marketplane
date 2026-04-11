@@ -14,6 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/roysav/marketplane/api/gen"
+	"github.com/roysav/marketplane/pkg/authz"
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/service"
 )
@@ -21,18 +22,23 @@ import (
 // Server implements the gRPC RecordService.
 type Server struct {
 	pb.UnimplementedRecordServiceServer
-	svc    *service.Service
-	logger *slog.Logger
+	svc        *service.Service
+	authorizer *authz.Authorizer
+	logger     *slog.Logger
 }
 
 // New creates a new gRPC server.
-func New(svc *service.Service, logger *slog.Logger) *Server {
+func New(svc *service.Service, authorizer *authz.Authorizer, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	if authorizer == nil {
+		authorizer = authz.New(authz.Config{})
+	}
 	return &Server{
-		svc:    svc,
-		logger: logger.With("component", "grpc"),
+		svc:        svc,
+		authorizer: authorizer,
+		logger:     logger.With("component", "grpc"),
 	}
 }
 
@@ -46,6 +52,9 @@ func (s *Server) Create(ctx context.Context, req *CreateRequest) (*CreateRespons
 	r, err := pbToRecord(req.Record)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid record: %v", err)
+	}
+	if err := s.authorizer.AuthorizeRecordCreate(ctx, r); err != nil {
+		return nil, toGRPCError(err)
 	}
 
 	created, err := s.svc.Create(ctx, r)
@@ -63,6 +72,9 @@ func (s *Server) Create(ctx context.Context, req *CreateRequest) (*CreateRespons
 
 // Get retrieves a record by key.
 func (s *Server) Get(ctx context.Context, req *GetRequest) (*GetResponse, error) {
+	if err := s.authorizer.AuthorizeRecordRead(ctx, authz.VerbGet, req.Type, req.Tradespace); err != nil {
+		return nil, toGRPCError(err)
+	}
 	r, err := s.svc.Get(ctx, req.Type, req.Tradespace, req.Name)
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -82,6 +94,13 @@ func (s *Server) Update(ctx context.Context, req *UpdateRequest) (*UpdateRespons
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid record: %v", err)
 	}
+	current, err := s.svc.Get(ctx, r.TypeMeta.GVK().Type(), r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
+	if err != nil {
+		return nil, toGRPCError(err)
+	}
+	if err := s.authorizer.AuthorizeRecordUpdate(ctx, current, r); err != nil {
+		return nil, toGRPCError(err)
+	}
 
 	updated, err := s.svc.Update(ctx, r)
 	if err != nil {
@@ -98,6 +117,9 @@ func (s *Server) Update(ctx context.Context, req *UpdateRequest) (*UpdateRespons
 
 // Delete removes a record.
 func (s *Server) Delete(ctx context.Context, req *DeleteRequest) (*DeleteResponse, error) {
+	if err := s.authorizer.AuthorizeRecordDelete(ctx, req.Type, req.Tradespace); err != nil {
+		return nil, toGRPCError(err)
+	}
 	err := s.svc.Delete(ctx, req.Type, req.Tradespace, req.Name)
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -108,6 +130,9 @@ func (s *Server) Delete(ctx context.Context, req *DeleteRequest) (*DeleteRespons
 
 // List returns records matching the query.
 func (s *Server) List(ctx context.Context, req *ListRequest) (*ListResponse, error) {
+	if err := s.authorizer.AuthorizeRecordRead(ctx, authz.VerbList, req.Type, req.Tradespace); err != nil {
+		return nil, toGRPCError(err)
+	}
 	records, err := s.svc.List(ctx, req.Type, req.Tradespace, req.Labels)
 	if err != nil {
 		return nil, toGRPCError(err)
@@ -133,6 +158,9 @@ func (s *Server) List(ctx context.Context, req *ListRequest) (*ListResponse, err
 // Watch streams record change events.
 func (s *Server) Watch(req *WatchRequest, stream grpc.ServerStreamingServer[WatchEvent]) error {
 	ctx := stream.Context()
+	if err := s.authorizer.AuthorizeRecordRead(ctx, authz.VerbWatch, req.Type, req.Tradespace); err != nil {
+		return toGRPCError(err)
+	}
 
 	eventCh, err := s.svc.Watch(ctx, req.Type)
 	if err != nil {
@@ -157,6 +185,9 @@ func (s *Server) Watch(req *WatchRequest, stream grpc.ServerStreamingServer[Watc
 			}
 			if err := json.Unmarshal([]byte(event.Data), &eventData); err != nil {
 				s.logger.Warn("failed to parse event data", "error", err)
+				continue
+			}
+			if req.Tradespace != "" && eventData.Tradespace != req.Tradespace {
 				continue
 			}
 
@@ -274,7 +305,19 @@ func toGRPCError(err error) error {
 	if errors.Is(err, service.ErrAlreadyExists) {
 		return status.Error(codes.AlreadyExists, err.Error())
 	}
+	if errors.Is(err, service.ErrConflict) {
+		return status.Error(codes.Aborted, err.Error())
+	}
 	if errors.Is(err, service.ErrValidation) {
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	if errors.Is(err, authz.ErrUnauthenticated) {
+		return status.Error(codes.Unauthenticated, err.Error())
+	}
+	if errors.Is(err, authz.ErrPermissionDenied) {
+		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	if errors.Is(err, authz.ErrInvalidRecordUpdate) {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 

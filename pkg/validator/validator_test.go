@@ -120,7 +120,7 @@ func TestValidate_CoreTypes(t *testing.T) {
 			name: "valid User",
 			record: &record.Record{
 				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
-				Spec:     map[string]any{"commonName": "alice", "description": "test user"},
+				Spec:     map[string]any{"description": "test user", "groups": []any{"ops"}},
 			},
 			wantErr: false,
 		},
@@ -128,15 +128,57 @@ func TestValidate_CoreTypes(t *testing.T) {
 			name: "valid User - minimal",
 			record: &record.Record{
 				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
-				Spec:     map[string]any{"commonName": "alice"},
+				Spec:     map[string]any{},
 			},
 			wantErr: false,
 		},
 		{
-			name: "invalid User - missing commonName",
+			name: "valid User - description only",
 			record: &record.Record{
 				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
 				Spec:     map[string]any{"description": "no cn"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid Role",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Role"},
+				Spec: map[string]any{
+					"tradespaces": []any{"prod"},
+					"rules": []any{
+						map[string]any{
+							"resources": []any{"record:core/v1/Quota"},
+							"verbs":     []any{"get"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid RoleBinding",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "RoleBinding"},
+				Spec: map[string]any{
+					"roleRef": "quota-reader",
+					"subjects": []any{
+						map[string]any{"kind": "Group", "name": "traders"},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid Allocation - zero amount",
+			record: &record.Record{
+				TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Allocation"},
+				Spec: map[string]any{
+					"currency":   "USD",
+					"amount":     "0",
+					"targetType": "core/v1/Deposit",
+					"targetName": "deposit-1",
+				},
 			},
 			wantErr: true,
 		},
@@ -255,6 +297,8 @@ func TestIsCoreType(t *testing.T) {
 		{"core/v1/MetaRecord", true},
 		{"core/v1/StreamDefinition", true},
 		{"core/v1/User", true},
+		{"core/v1/Role", true},
+		{"core/v1/RoleBinding", true},
 		{"polymarket/v1/Order", false},
 	}
 
@@ -298,7 +342,7 @@ func TestValidateScope_User(t *testing.T) {
 			r := &record.Record{
 				TypeMeta:   record.TypeMeta{Group: "core", Version: "v1", Kind: "User"},
 				ObjectMeta: record.ObjectMeta{Tradespace: tt.tradespace},
-				Spec:       map[string]any{"commonName": "alice"},
+				Spec:       map[string]any{"groups": []any{"ops"}},
 			}
 			err := v.ValidateScope(ctx, r)
 			if (err != nil) != tt.wantErr {
