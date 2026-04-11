@@ -62,6 +62,7 @@ func main() {
 		rows, rowsErr = postgres.New(ctx, *dbPath)
 		ledger, ledgerErr = postgres.NewLedgerStorage(ctx, *dbPath)
 	} else {
+		rows, rowsErr = sqlite.New(ctx, *dbPath)
 		ledger, ledgerErr = sqlite.NewLedgerStorage(ctx, *dbPath)
 	}
 
