@@ -2,9 +2,11 @@
 package record
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/roysav/marketplane/pkg/storage"
 	"github.com/xeipuuv/gojsonschema"
@@ -69,7 +71,7 @@ var (
 	coreSchemas = map[string]map[string]any{
 		"core/v1/MetaRecord": {
 			"type":     "object",
-			"required": []any{"group", "version", "kind"},
+			"required": []any{"group", "version", "kind", "schema"},
 			"properties": map[string]any{
 				"group":   map[string]any{"type": "string"},
 				"version": map[string]any{"type": "string"},
@@ -119,23 +121,63 @@ var (
 	}
 )
 
+const MetaRecordType = "core/v1/MetaRecord"
+
 type Validator struct {
-	Schemas map[string]*gojsonschema.Schema
+	mu          sync.RWMutex
+	schemas     map[string]*gojsonschema.Schema
+	definitions map[string][]byte
 }
 
 func NewValidator() (*Validator, error) {
-	compiledSchemas := make(map[string]*gojsonschema.Schema)
+	v := &Validator{
+		schemas:     make(map[string]*gojsonschema.Schema),
+		definitions: make(map[string][]byte),
+	}
+
 	for key, schema := range coreSchemas {
-		compiled, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(schema))
+		prepared, err := prepareSchema(key, schema)
 		if err != nil {
 			return nil, err
 		}
-		compiledSchemas[key] = compiled
+		v.schemas[key] = prepared.compiled
+		v.definitions[key] = prepared.definition
 	}
 
-	return &Validator{
-		Schemas: compiledSchemas,
-	}, nil
+	return v, nil
+}
+
+func (v *Validator) CheckMetaRecord(r *Record) error {
+	prepared, err := prepareMetaRecordSchema(r)
+	if err != nil {
+		return err
+	}
+
+	v.mu.RLock()
+	defer v.mu.RUnlock()
+
+	return ensureImmutable(v.definitions, prepared.typeStr, prepared.definition)
+}
+
+func (v *Validator) RegisterMetaRecord(r *Record) error {
+	prepared, err := prepareMetaRecordSchema(r)
+	if err != nil {
+		return err
+	}
+
+	v.mu.Lock()
+	defer v.mu.Unlock()
+
+	if err := ensureImmutable(v.definitions, prepared.typeStr, prepared.definition); err != nil {
+		return err
+	}
+	if _, exists := v.schemas[prepared.typeStr]; exists {
+		return nil
+	}
+
+	v.schemas[prepared.typeStr] = prepared.compiled
+	v.definitions[prepared.typeStr] = prepared.definition
+	return nil
 }
 
 func (v *Validator) Validate(r *Record) error {
@@ -149,8 +191,10 @@ func (v *Validator) Validate(r *Record) error {
 
 func (v *Validator) validate(r *Record) (bool, []error, error) {
 	t := r.Type
-	jsonSchema, ok := v.Schemas[t]
 	errors := make([]error, 0)
+	v.mu.RLock()
+	jsonSchema, ok := v.schemas[t]
+	v.mu.RUnlock()
 	if !ok {
 		return false, errors, fmt.Errorf("couldn't find schema for record of type %s", t)
 	}
@@ -166,4 +210,92 @@ func (v *Validator) validate(r *Record) (bool, []error, error) {
 		}
 	}
 	return isValid, errors, nil
+}
+
+func EnsureMetaRecordDefinitionImmutable(current, next *Record) error {
+	currentType, currentDefinition, err := metaRecordFingerprint(current)
+	if err != nil {
+		return err
+	}
+
+	nextType, nextDefinition, err := metaRecordFingerprint(next)
+	if err != nil {
+		return err
+	}
+
+	if currentType != nextType {
+		return fmt.Errorf("MetaRecord type is immutable: %s -> %s", currentType, nextType)
+	}
+	if !bytes.Equal(currentDefinition, nextDefinition) {
+		return fmt.Errorf("schema for %s is immutable", currentType)
+	}
+
+	return nil
+}
+
+type preparedSchema struct {
+	typeStr    string
+	compiled   *gojsonschema.Schema
+	definition []byte
+}
+
+func prepareMetaRecordSchema(r *Record) (*preparedSchema, error) {
+	typeStr, schema, err := MetaRecordDefinition(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return prepareSchema(typeStr, schema)
+}
+
+func prepareSchema(typeStr string, schema map[string]any) (*preparedSchema, error) {
+	definition, err := normalizeSchema(schema)
+	if err != nil {
+		return nil, fmt.Errorf("normalize schema for %s: %w", typeStr, err)
+	}
+
+	compiled, err := gojsonschema.NewSchema(gojsonschema.NewGoLoader(schema))
+	if err != nil {
+		return nil, fmt.Errorf("compile schema for %s: %w", typeStr, err)
+	}
+
+	return &preparedSchema{
+		typeStr:    typeStr,
+		compiled:   compiled,
+		definition: definition,
+	}, nil
+}
+
+func ensureImmutable(definitions map[string][]byte, typeStr string, definition []byte) error {
+	existing, ok := definitions[typeStr]
+	if !ok {
+		return nil
+	}
+	if bytes.Equal(existing, definition) {
+		return nil
+	}
+	return fmt.Errorf("schema for %s is immutable", typeStr)
+}
+
+func MetaRecordDefinition(r *Record) (string, map[string]any, error) {
+	rawSchema := r.Spec["schema"].(map[string]any)
+	return fmt.Sprintf("%s/%s/%s", r.Spec["group"], r.Spec["version"], r.Spec["kind"]), rawSchema, nil
+}
+
+func metaRecordFingerprint(r *Record) (string, []byte, error) {
+	typeStr, schema, err := MetaRecordDefinition(r)
+	if err != nil {
+		return "", nil, err
+	}
+
+	definition, err := normalizeSchema(schema)
+	if err != nil {
+		return "", nil, fmt.Errorf("normalize schema for %s: %w", typeStr, err)
+	}
+
+	return typeStr, definition, nil
+}
+
+func normalizeSchema(schema map[string]any) ([]byte, error) {
+	return json.Marshal(schema)
 }

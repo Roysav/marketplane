@@ -16,7 +16,7 @@ type LedgerStorage struct {
 	pool *pgxpool.Pool
 }
 
-// NewLedgerStorage creates a LedgerStorage from an existing connection pool.
+// NewLedgerStorage creates a LedgerStorage from an existing connection Pool.
 func NewLedgerStorage(pool *pgxpool.Pool) *LedgerStorage {
 	return &LedgerStorage{pool: pool}
 }

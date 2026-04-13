@@ -70,7 +70,7 @@ func Pool(ctx context.Context, t *testing.T) *pgxpool.Pool {
 			return
 		}
 		dropSQL := fmt.Sprintf("DROP DATABASE \"%s\"", dbName)
-		if _, err := cleanupPool.Exec(ctx, dropSQL); err != nil {
+		if _, err := cleanupPool.Exec(context.Background(), dropSQL); err != nil {
 			t.Errorf("cleanup: drop test database %s: %v", dbName, err)
 		}
 		cleanupPool.Close()
@@ -93,12 +93,15 @@ func SVC(ctx context.Context, t *testing.T) *service.RecordService {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-
-	return service.New(service.Config{
+	syncCtx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
+	svc := service.New(service.Config{
 		Rows:      rows,
 		Validator: validator,
 		Logger:    logger,
 	})
+	svc.StartMetaRecordSync(syncCtx, service.DefaultMetaRecordSyncInterval)
+	return svc
 }
 
 // LedgerSVC creates a LedgerService and its backing RecordService on a fresh
@@ -115,12 +118,14 @@ func LedgerSVC(ctx context.Context, t *testing.T) (*service.LedgerService, *serv
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-
+	syncCtx, cancel := context.WithCancel(ctx)
+	t.Cleanup(cancel)
 	recordSvc := service.New(service.Config{
 		Rows:      rows,
 		Validator: validator,
 		Logger:    logger,
 	})
+	recordSvc.StartMetaRecordSync(syncCtx, service.DefaultMetaRecordSyncInterval)
 
 	ledgerStorage := postgres.NewLedgerStorage(pool)
 	ledgerSvc := service.NewLedgerService(ledgerStorage, *recordSvc, logger)

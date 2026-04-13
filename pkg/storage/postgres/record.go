@@ -15,16 +15,16 @@ import (
 
 // Storage implements storage.RowStorage using PostgreSQL.
 type Storage struct {
-	pool *pgxpool.Pool
+	Pool *pgxpool.Pool
 }
 
-// New creates a Storage from an existing connection pool.
+// New creates a Storage from an existing connection Pool.
 func New(pool *pgxpool.Pool) *Storage {
-	return &Storage{pool: pool}
+	return &Storage{Pool: pool}
 }
 
 func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, error) {
-	_, err := s.pool.Exec(ctx,
+	_, err := s.Pool.Exec(ctx,
 		`INSERT INTO records (key, data, labels) VALUES ($1, $2, $3)`,
 		r.Key, r.Data, labelsToArray(r.Labels),
 	)
@@ -40,7 +40,7 @@ func (s *Storage) Create(ctx context.Context, r *storage.Row) (*storage.Row, err
 func (s *Storage) Get(ctx context.Context, key string) (*storage.Row, error) {
 	row := &storage.Row{Key: key}
 	var labels []string
-	err := s.pool.QueryRow(ctx,
+	err := s.Pool.QueryRow(ctx,
 		`SELECT data, labels FROM records WHERE key = $1`,
 		key,
 	).Scan(&row.Data, &labels)
@@ -55,7 +55,7 @@ func (s *Storage) Get(ctx context.Context, key string) (*storage.Row, error) {
 }
 
 func (s *Storage) Update(ctx context.Context, r *storage.Row, lastApplied []byte) (*storage.Row, error) {
-	tag, err := s.pool.Exec(ctx,
+	tag, err := s.Pool.Exec(ctx,
 		`UPDATE records SET data = $2, labels = $3 WHERE key = $1`,
 		r.Key, r.Data, labelsToArray(r.Labels),
 	)
@@ -69,7 +69,7 @@ func (s *Storage) Update(ctx context.Context, r *storage.Row, lastApplied []byte
 }
 
 func (s *Storage) Delete(ctx context.Context, key string) error {
-	tag, err := s.pool.Exec(ctx, `DELETE FROM records WHERE key = $1`, key)
+	tag, err := s.Pool.Exec(ctx, `DELETE FROM records WHERE key = $1`, key)
 	if err != nil {
 		return fmt.Errorf("postgres: delete: %w", err)
 	}
@@ -100,7 +100,7 @@ func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Row, er
 		query += fmt.Sprintf(" LIMIT $%d", len(args))
 	}
 
-	rows, err := s.pool.Query(ctx, query, args...)
+	rows, err := s.Pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("postgres: list: %w", err)
 	}
@@ -120,7 +120,7 @@ func (s *Storage) List(ctx context.Context, q storage.Query) ([]*storage.Row, er
 }
 
 func (s *Storage) Close() error {
-	s.pool.Close()
+	s.Pool.Close()
 	return nil
 }
 

@@ -1,38 +1,20 @@
-package postgres
+package postgres_test
 
 import (
 	"context"
-	"os"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/roysav/marketplane/pkg/storage"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
+	"github.com/roysav/marketplane/tests"
 )
 
 const defaultTestDSN = "postgres://marketplane:marketplane@localhost:5432/marketplane?sslmode=disable"
 
-func newTestStorage(t *testing.T) *Storage {
+func newTestStorage(t *testing.T) *postgres.Storage {
 	t.Helper()
-	ctx := context.Background()
-
-	dsn := os.Getenv("TEST_POSTGRES_DSN")
-	if dsn == "" {
-		dsn = defaultTestDSN
-	}
-
-	pool, err := pgxpool.New(ctx, dsn)
-	s := New(pool)
-	if err != nil {
-		t.Skipf("postgres not available: %v", err)
-	}
-
-	_, err = s.pool.Exec(ctx, `TRUNCATE TABLE records`)
-	if err != nil {
-		t.Fatalf("truncate: %v", err)
-	}
-
-	t.Cleanup(func() { s.Close() })
-	return s
+	pool := tests.Pool(t.Context(), t)
+	return &postgres.Storage{pool}
 }
 
 func TestStorage_CreateAndGet(t *testing.T) {

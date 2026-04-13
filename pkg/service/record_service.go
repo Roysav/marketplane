@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
@@ -19,6 +21,8 @@ var (
 	ErrValidation    = errors.New("validation failed")
 	ErrInvalidScope  = errors.New("invalid scope")
 )
+
+const DefaultMetaRecordSyncInterval = 30 * time.Second
 
 // Config holds configuration for the RecordService.
 // TODO: Remove the config thing. Just pass it directly to constructor of the RecordService, remove the default slog, we already pass one from main.go.
@@ -55,10 +59,12 @@ func New(cfg Config) *RecordService {
 
 // Create creates a new record.
 func (s *RecordService) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
-
 	// Validate the record spec against schema
 	if err := s.validator.Validate(r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+	if err := s.validateMetaRecordCreate(r); err != nil {
+		return nil, err
 	}
 
 	// Convert to row
@@ -73,6 +79,9 @@ func (s *RecordService) Create(ctx context.Context, r *record.Record) (*record.R
 		if isAlreadyExists(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrAlreadyExists, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
 		}
+		return nil, err
+	}
+	if err := s.registerCreatedMetaRecord(ctx, r); err != nil {
 		return nil, err
 	}
 
@@ -97,6 +106,9 @@ func (s *RecordService) Get(ctx context.Context, typeStr, tradespace, name strin
 
 // Update updates an existing record.
 func (s *RecordService) Update(ctx context.Context, r *record.Record, lastApplied []byte) (*record.Record, error) {
+	if err := s.validateMetaRecordUpdate(ctx, r); err != nil {
+		return nil, err
+	}
 	if err := s.validator.Validate(r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
@@ -111,6 +123,9 @@ func (s *RecordService) Update(ctx context.Context, r *record.Record, lastApplie
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
 		}
+		return nil, err
+	}
+	if err := s.registerMetaRecord(r); err != nil {
 		return nil, err
 	}
 
@@ -181,6 +196,52 @@ func (s *RecordService) Watch(ctx context.Context, typeStr string) (<-chan stora
 	return s.events.Subscribe(ctx, topic)
 }
 
+func (s *RecordService) StartMetaRecordSync(ctx context.Context, interval time.Duration) {
+	if interval <= 0 {
+		interval = DefaultMetaRecordSyncInterval
+	}
+
+	if err := s.SyncMetaRecords(ctx); err != nil {
+		s.logger.Warn("failed to sync MetaRecord schemas", "error", err)
+	}
+
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := s.SyncMetaRecords(ctx); err != nil {
+					s.logger.Warn("failed to sync MetaRecord schemas", "error", err)
+				}
+			}
+		}
+	}()
+}
+
+func (s *RecordService) SyncMetaRecords(ctx context.Context) error {
+	metaRecords, err := s.List(ctx, record.MetaRecordType, "", nil)
+	if err != nil {
+		return fmt.Errorf("list MetaRecords: %w", err)
+	}
+
+	sort.Slice(metaRecords, func(i, j int) bool {
+		return metaRecords[i].Key() < metaRecords[j].Key()
+	})
+
+	var syncErrs []error
+	for _, metaRecord := range metaRecords {
+		if err := s.registerMetaRecord(metaRecord); err != nil {
+			syncErrs = append(syncErrs, fmt.Errorf("%s: %w", metaRecord.Key(), err))
+		}
+	}
+
+	return errors.Join(syncErrs...)
+}
+
 func (s *RecordService) publishEvent(ctx context.Context, action string, r *record.Record) {
 	if s.events == nil {
 		return
@@ -232,4 +293,64 @@ func isAlreadyExists(err error) bool {
 	}
 	return errors.Is(err, storage.ErrAlreadyExists) ||
 		strings.Contains(err.Error(), "already exists")
+}
+
+func (s *RecordService) validateMetaRecordCreate(r *record.Record) error {
+	if r.Type != record.MetaRecordType {
+		return nil
+	}
+
+	if err := s.validator.CheckMetaRecord(r); err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+
+	return nil
+}
+
+func (s *RecordService) validateMetaRecordUpdate(ctx context.Context, r *record.Record) error {
+	if r.Type != record.MetaRecordType {
+		return nil
+	}
+
+	current, err := s.Get(ctx, r.Type, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
+	if err != nil {
+		return err
+	}
+
+	if err := record.EnsureMetaRecordDefinitionImmutable(current, r); err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+	if err := s.validator.CheckMetaRecord(r); err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+
+	return nil
+}
+
+func (s *RecordService) registerCreatedMetaRecord(ctx context.Context, r *record.Record) error {
+	if err := s.registerMetaRecord(r); err != nil {
+		if r.Type == record.MetaRecordType {
+			if deleteErr := s.rows.Delete(ctx, r.Key()); deleteErr != nil {
+				s.logger.Warn("failed to roll back MetaRecord after validator registration failure",
+					"key", r.Key(),
+					"error", deleteErr,
+				)
+			}
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (s *RecordService) registerMetaRecord(r *record.Record) error {
+	if r.Type != record.MetaRecordType {
+		return nil
+	}
+
+	if err := s.validator.RegisterMetaRecord(r); err != nil {
+		return fmt.Errorf("%w: %v", ErrValidation, err)
+	}
+
+	return nil
 }

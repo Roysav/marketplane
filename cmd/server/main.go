@@ -80,6 +80,10 @@ func main() {
 	}
 
 	validator, err := record.NewValidator()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create validator: %v", err))
+	}
+
 	// Initialize services
 	var svc = service.New(service.Config{
 		Rows:      rows,
@@ -87,6 +91,7 @@ func main() {
 		Validator: validator,
 		Logger:    logger,
 	})
+	svc.StartMetaRecordSync(ctx, service.DefaultMetaRecordSyncInterval)
 	streamSvc := service.NewStreamService(service.StreamServiceConfig{
 		Rows:    rows,
 		Streams: streams,
