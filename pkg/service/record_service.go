@@ -139,10 +139,15 @@ func (s *RecordService) Delete(ctx context.Context, typeStr, tradespace, name st
 	return nil
 }
 
-// List returns records matching the query.
+// List returns records matching the query. If tradespace is empty, all
+// tradespaces for the given type are returned.
 func (s *RecordService) List(ctx context.Context, typeStr string, tradespace string, labels map[string]string) ([]*record.Record, error) {
+	prefix := record.Key(typeStr, tradespace, "")
+	if tradespace == "" {
+		prefix = typeStr + "/"
+	}
 	rows, err := s.rows.List(ctx, storage.Query{
-		Prefix: record.Key(typeStr, tradespace, ""),
+		Prefix: prefix,
 		Labels: labels,
 		Limit:  0,
 	},
