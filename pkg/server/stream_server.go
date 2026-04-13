@@ -147,17 +147,16 @@ func validateStreamKey(k *pb.StreamKey) (service.StreamKey, error) {
 	if k == nil {
 		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key is required")
 	}
-	if k.Name == "" {
-		return service.StreamKey{}, status.Error(codes.InvalidArgument, "key.name is required")
-	}
 	return service.StreamKey{
-		Name: k.Name,
+		Name:       k.Name,
+		Tradespace: k.Tradespace,
 	}, nil
 }
 
 func pbStreamKey(k service.StreamKey) *pb.StreamKey {
 	return &pb.StreamKey{
-		Name: k.Name,
+		Tradespace: k.Tradespace,
+		Name:       k.Name,
 	}
 }
 

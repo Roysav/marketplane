@@ -26,7 +26,8 @@ const (
 // StreamKey uniquely identifies a stream. All fields are required.
 type StreamKey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"` // e.g., "btcusdt"
+	Tradespace    string                 `protobuf:"bytes,1,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -59,6 +60,13 @@ func (x *StreamKey) ProtoReflect() protoreflect.Message {
 // Deprecated: Use StreamKey.ProtoReflect.Descriptor instead.
 func (*StreamKey) Descriptor() ([]byte, []int) {
 	return file_stream_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *StreamKey) GetTradespace() string {
+	if x != nil {
+		return x.Tradespace
+	}
+	return ""
 }
 
 func (x *StreamKey) GetName() string {
@@ -472,9 +480,12 @@ var File_stream_proto protoreflect.FileDescriptor
 
 const file_stream_proto_rawDesc = "" +
 	"\n" +
-	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x1f\n" +
-	"\tStreamKey\x12\x12\n" +
-	"\x04name\x18\x04 \x01(\tR\x04name\"\xa3\x01\n" +
+	"\fstream.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"?\n" +
+	"\tStreamKey\x12\x1e\n" +
+	"\n" +
+	"tradespace\x18\x01 \x01(\tR\n" +
+	"tradespace\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xa3\x01\n" +
 	"\rAppendRequest\x12+\n" +
 	"\x03key\x18\x01 \x01(\v2\x19.marketplane.v1.StreamKeyR\x03key\x128\n" +
 	"\ttimestamp\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12+\n" +

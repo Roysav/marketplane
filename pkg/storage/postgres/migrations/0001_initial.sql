@@ -9,9 +9,13 @@ CREATE INDEX idx_records_labels ON records (labels);
 
 
 CREATE TABLE "ledger" (
-    key      TEXT PRIMARY KEY,  --- referencing the record
+    key      TEXT UNIQUE,
     amount   DECIMAL,
-    currency TEXT
+    remaining DECIMAL,
+    currency TEXT,
+    CONSTRAINT fk_record
+                      FOREIGN KEY (key)
+                      REFERENCES records(key)
 );
 
 CREATE INDEX idx_ledger_key_currency ON ledger (key, currency)

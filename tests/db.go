@@ -96,7 +96,7 @@ func SVC(ctx context.Context, t *testing.T) *service.Service {
 
 	return service.New(service.Config{
 		Rows:      rows,
-		Validator: *validator,
+		Validator: validator,
 		Logger:    logger,
 	})
 }

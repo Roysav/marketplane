@@ -24,7 +24,8 @@ service StreamService {
 
 // StreamKey uniquely identifies a stream. All fields are required.
 message StreamKey {
-  string name = 4;     // e.g., "btcusdt"
+  string tradespace = 1;
+  string name = 2;
 }
 
 // AppendRequest is the request for Append.

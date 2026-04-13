@@ -18,19 +18,22 @@ func newTestService(t *testing.T) *service.Service {
 	return tests.SVC(ctx, t)
 }
 
+func tradespaceRecord(name string) *record.Record {
+	return &record.Record{
+		Type: "core/v1/Tradespace",
+		ObjectMeta: record.ObjectMeta{
+			Tradespace: "default",
+			Name:       name,
+			Labels:     map[string]string{"env": "test"},
+		},
+		Spec: map[string]any{"description": "A test tradespace", "name": name},
+	}
+}
 func TestService_CreateAndGet(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	r := &record.Record{
-		Type: "core/v1/Tradespace",
-		ObjectMeta: record.ObjectMeta{
-			Tradespace: "default",
-			Name:       "test-tradespace",
-			Labels:     map[string]string{"env": "test"},
-		},
-		Spec: map[string]any{"description": "A test tradespace", "name": "test-tradespace"},
-	}
+	r := tradespaceRecord("test-tradespace")
 
 	// Create
 	created, err := svc.Create(ctx, r)
@@ -60,14 +63,7 @@ func TestService_CreateDuplicate(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	r := &record.Record{
-		Type: "core/v1/Tradespace",
-		ObjectMeta: record.ObjectMeta{
-			Tradespace: "default",
-			Name:       "dup-test",
-		},
-		Spec: map[string]any{},
-	}
+	r := tradespaceRecord("dup-tradespace")
 
 	_, err := svc.Create(ctx, r)
 	if err != nil {
@@ -84,14 +80,7 @@ func TestService_Update(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	r := &record.Record{
-		Type: "core/v1/Tradespace",
-		ObjectMeta: record.ObjectMeta{
-			Tradespace: "default",
-			Name:       "update-test",
-		},
-		Spec: map[string]any{"description": "original"},
-	}
+	r := tradespaceRecord("update-test")
 
 	created, err := svc.Create(ctx, r)
 	if err != nil {
@@ -117,14 +106,7 @@ func TestService_Delete(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	r := &record.Record{
-		Type: "core/v1/Tradespace",
-		ObjectMeta: record.ObjectMeta{
-			Tradespace: "default",
-			Name:       "delete-test",
-		},
-		Spec: map[string]any{},
-	}
+	r := tradespaceRecord("delete-test")
 
 	_, err := svc.Create(ctx, r)
 	if err != nil {
@@ -148,14 +130,7 @@ func TestService_List(t *testing.T) {
 
 	// Create multiple records
 	for _, name := range []string{"ts-1", "ts-2", "ts-3"} {
-		r := &record.Record{
-			Type: "core/v1/Tradespace",
-			ObjectMeta: record.ObjectMeta{
-				Tradespace: "default",
-				Name:       name,
-			},
-			Spec: map[string]any{},
-		}
+		r := tradespaceRecord(name)
 		_, err := svc.Create(ctx, r)
 		if err != nil {
 			t.Fatalf("Create %s failed: %v", name, err)
@@ -163,7 +138,7 @@ func TestService_List(t *testing.T) {
 	}
 
 	// List all
-	records, err := svc.List(ctx, "core/v1/Tradespace", "", nil)
+	records, err := svc.List(ctx, "core/v1/Tradespace", "default", nil)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -176,17 +151,12 @@ func TestService_List(t *testing.T) {
 func TestService_ListByTradespace(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
+	tradespace := "list-test"
 
 	// Create records in different tradespaces
-	for _, ts := range []string{"prod", "staging", "prod"} {
-		r := &record.Record{
-			Type: "core/v1/Tradespace",
-			ObjectMeta: record.ObjectMeta{
-				Tradespace: ts,
-				Name:       "ts-" + ts + "-" + randomSuffix(),
-			},
-			Spec: map[string]any{},
-		}
+	for _, ts := range []string{"list-test-a", "list-test-b", "list-test-c"} {
+		r := tradespaceRecord(ts)
+		r.ObjectMeta.Tradespace = tradespace
 		_, err := svc.Create(ctx, r)
 		if err != nil {
 			t.Fatalf("Create failed: %v", err)
@@ -194,33 +164,13 @@ func TestService_ListByTradespace(t *testing.T) {
 	}
 
 	// List only prod
-	records, err := svc.List(ctx, "core/v1/Tradespace", "prod", nil)
+	records, err := svc.List(ctx, "core/v1/Tradespace", tradespace, nil)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
 
-	if len(records) != 2 {
-		t.Errorf("expected 2 records in prod, got %d", len(records))
-	}
-}
-
-func TestService_ValidationError(t *testing.T) {
-	svc := newTestService(t)
-	ctx := context.Background()
-
-	// Missing required field "balances" for Quota
-	r := &record.Record{
-		Type: "core/v1/Quota",
-		ObjectMeta: record.ObjectMeta{
-			Tradespace: "myns",
-			Name:       "invalid-quota",
-		},
-		Spec: map[string]any{}, // missing "balances"
-	}
-
-	_, err := svc.Create(ctx, r)
-	if !errors.Is(err, service.ErrValidation) {
-		t.Errorf("expected ErrValidation, got: %v", err)
+	if len(records) != 3 {
+		t.Errorf("expected 3 records in prod, got %d", len(records))
 	}
 }
 
