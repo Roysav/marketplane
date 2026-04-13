@@ -49,11 +49,9 @@ Type string: `"group/version/kind"` e.g., `"core/v1/Tradespace"`
 | `core/v1/MetaRecord` | Defines custom record types (Row storage) |
 | `core/v1/StreamDefinition` | Defines custom stream types (Stream storage) |
 | `core/v1/Tradespace` | Isolation boundary |
-| `core/v1/Quota` | Balance limits per Tradespace |
 
 ### Tradespace
 - Isolation boundary for records (like K8s namespace)
-- Global records use `"default"` tradespace
 
 ### MetaRecord
 Define custom record types (Row storage):
@@ -102,9 +100,6 @@ pkg/
 │   ├── storage.go         # RowStorage interface (Row type)
 │   ├── stream.go          # StreamStorage interface (timeseries)
 │   ├── event.go           # EventStorage interface (message queue)
-│   ├── sqlite/
-│   │   ├── sqlite.go      # SQLite RowStorage implementation
-│   │   └── sqlite_test.go
 │   └── redis/
 │       ├── redis.go       # Redis client setup
 │       ├── stream.go      # Redis TimeSeries implementation
@@ -155,13 +150,13 @@ type RowStorage interface {
 
 
 ## Not Implemented Yet
-- [ ] gRPC API Server
+- [x] gRPC API Server
 - [x] Redis (Stream storage, watches) ✓
 - [x] Service layer ✓
 - [ ] RBAC
-- [ ] Allocation (cross-tradespace funds)
+- [x] Allocation 
 - [ ] CLI
-- [ ] PostgreSQL
+- [x] PostgreSQL
 - [ ] Intensive Validation
 
 ## Commands
