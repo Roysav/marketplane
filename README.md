@@ -58,7 +58,7 @@ Create an EntityDefinition to register a new type:
 pkg/
 ├── entity/          # Core types (Entity, TypeMeta, ObjectMeta)
 ├── storage/         # RecordStorage interface
-│   └── sqlite/      # SQLite implementation
+│   └── postgres/    # Postgres implementation
 └── validator/       # Schema validation
 ```
 
@@ -68,11 +68,10 @@ pkg/
 
 - [x] Core entity types
 - [x] RecordStorage interface
-- [x] SQLite implementation
+- [x] PostgreSQL implementation
 - [x] Schema validation
 - [ ] gRPC API Server
 - [ ] Redis (Stream storage, watches)
-- [ ] PostgreSQL implementation
 - [ ] CLI tool
 
 ## License

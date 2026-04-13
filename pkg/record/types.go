@@ -28,8 +28,8 @@ type Record struct {
 type StorageType string
 
 const (
-	StorageRow    StorageType = "record" // PostgreSQL/SQLite
-	StorageStream StorageType = "stream" // Redis
+	StorageRow    StorageType = "record"
+	StorageStream StorageType = "stream"
 )
 
 // ScopeType indicates record scoping.
