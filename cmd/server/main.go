@@ -10,21 +10,25 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/roysav/marketplane/pkg/record"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/roysav/marketplane/pkg/server"
 	"github.com/roysav/marketplane/pkg/service"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/redis"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
 )
 
 func main() {
 	var (
-		port      = flag.Int("port", 50051, "gRPC server port")
-		dbPath    = flag.String("db", "marketplane.db", "SQLite database path (use :memory: for in-memory)")
-		redisAddr = flag.String("redis", "localhost:6379", "Redis address")
-		debug     = flag.Bool("debug", false, "Enable debug logging")
+		port        = flag.Int("port", 50051, "gRPC server port")
+		postgresURL = flag.String("postgres", "", "PostgreSQL connection URL (e.g. postgres://user:pass@localhost:5432/marketplane)")
+		redisAddr   = flag.String("redis", "localhost:6379", "Redis address")
+		migrate     = flag.Bool("migrate", false, "Run PostgreSQL migrations and exit")
+		debug       = flag.Bool("debug", false, "Enable debug logging")
 	)
 	flag.Parse()
 
@@ -39,15 +43,29 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize storage
-	logger.Info("initializing storage", "db", *dbPath, "redis", *redisAddr)
-
-	rows, err := sqlite.New(ctx, *dbPath)
-	if err != nil {
-		logger.Error("failed to initialize SQLite", "error", err)
-		os.Exit(1)
+	// Initialize PostgreSQL
+	if *postgresURL == "" {
+		panic("--postgres is required")
 	}
-	defer rows.Close()
+	pool, err := pgxpool.New(ctx, *postgresURL)
+	if err != nil {
+		panic(fmt.Sprintf("failed to connect to postgres: %v", err))
+	}
+	defer pool.Close()
+
+	// Run migrations if requested
+	if *migrate {
+		logger.Info("running migrations")
+		if err := postgres.Migrate(ctx, pool); err != nil {
+			panic(fmt.Sprintf("migration failed: %v", err))
+		}
+		logger.Info("migrations complete")
+		return
+	}
+
+	// Initialize storage
+	logger.Info("initializing storage", "redis", *redisAddr)
+	rows := postgres.New(pool)
 
 	// Redis is optional - continue without streams/events if unavailable
 	var events *redis.EventStorage
@@ -61,13 +79,14 @@ func main() {
 		defer redisClient.Close()
 	}
 
+	validator, err := record.NewValidator()
 	// Initialize services
-	svc := service.New(service.Config{
-		Rows:   rows,
-		Events: events,
-		Logger: logger,
+	var svc = service.New(service.Config{
+		Rows:      rows,
+		Events:    events,
+		Validator: validator,
+		Logger:    logger,
 	})
-
 	streamSvc := service.NewStreamService(service.StreamServiceConfig{
 		Rows:    rows,
 		Streams: streams,
@@ -89,8 +108,7 @@ func main() {
 	addr := fmt.Sprintf(":%d", *port)
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		logger.Error("failed to listen", "error", err)
-		os.Exit(1)
+		panic(fmt.Sprintf("failed to listen: %v", err))
 	}
 
 	// Handle shutdown
@@ -105,7 +123,6 @@ func main() {
 
 	logger.Info("server started", "addr", addr)
 	if err := grpcServer.Serve(lis); err != nil {
-		logger.Error("server error", "error", err)
-		os.Exit(1)
+		panic(fmt.Sprintf("server error: %v", err))
 	}
 }

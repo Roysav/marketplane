@@ -40,3 +40,5 @@ config.local.yaml
 
 # Build
 dist/
+
+certs/

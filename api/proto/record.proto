@@ -5,7 +5,6 @@ package marketplane.v1;
 option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1";
 
 import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
 
 // RecordService provides CRUD operations for records.
 service RecordService {
@@ -28,27 +27,16 @@ service RecordService {
   rpc Watch(WatchRequest) returns (stream WatchEvent);
 }
 
-// TypeMeta describes the type of a record.
-message TypeMeta {
-  string group = 1;
-  string version = 2;
-  string kind = 3;
-}
-
 // ObjectMeta contains metadata about a record.
 message ObjectMeta {
   string name = 1;
   string tradespace = 2;
   map<string, string> labels = 3;
-  map<string, string> annotations = 4;
-  int64 resource_version = 5;
-  google.protobuf.Timestamp created_at = 6;
-  google.protobuf.Timestamp updated_at = 7;
 }
 
 // Record is the generic wrapper for all resources.
 message Record {
-  TypeMeta type_meta = 1;
+  string type = 1;
   ObjectMeta object_meta = 2;
   google.protobuf.Struct spec = 3;
   google.protobuf.Struct status = 4;

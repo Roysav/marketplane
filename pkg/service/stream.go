@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roysav/marketplane/pkg/record"
 	"github.com/xeipuuv/gojsonschema"
 
 	"github.com/roysav/marketplane/pkg/storage"
@@ -21,12 +22,13 @@ var (
 
 // StreamKey uniquely identifies a stream.
 type StreamKey struct {
-	Name string
+	Tradespace string
+	Name       string
 }
 
 // String returns the full key as group/version/kind/name.
 func (k StreamKey) String() string {
-	return fmt.Sprintf("%s", k.Name)
+	return record.Key("core/v1/StreamDefinition", k.Tradespace, k.Name)
 }
 
 // StreamDefinitionSpec represents the spec of a StreamDefinition record.
@@ -138,18 +140,14 @@ func (s *StreamService) Watch(ctx context.Context, key StreamKey) (<-chan storag
 func (s *StreamService) getDefinition(ctx context.Context, key StreamKey) (*StreamDefinitionSpec, error) {
 	// StreamDefinition is stored with name as the identifier
 	// We need to find the one that matches group/version/kind
-	row, err := s.rows.Get(ctx, storage.Key{
-		Type:       "core/v1/StreamDefinition",
-		Tradespace: "default",
-		Name:       key.Name,
-	})
+	row, err := s.rows.Get(ctx, key.String())
 	if err != nil {
 		s.logger.Warn("stream definition not found", "key", key.String(), "error", err)
 		return nil, fmt.Errorf("%w: %s", ErrStreamNotFound, key.String())
 	}
 
 	var spec StreamDefinitionSpec
-	if err := json.Unmarshal([]byte(row.Data), &spec); err != nil {
+	if err := json.Unmarshal(row.Data, &spec); err != nil {
 		return nil, fmt.Errorf("invalid stream definition data: %w", err)
 	}
 

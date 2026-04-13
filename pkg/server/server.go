@@ -11,7 +11,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	pb "github.com/roysav/marketplane/api/gen"
 	"github.com/roysav/marketplane/pkg/record"
@@ -118,7 +117,7 @@ func (s *Server) List(ctx context.Context, req *ListRequest) (*ListResponse, err
 		pbRec, err := recordToPB(r)
 		if err != nil {
 			s.logger.Warn("skipping record in list response",
-				"type", r.TypeMeta.GVK().Type(),
+				"type", r.Type,
 				"name", r.ObjectMeta.Name,
 				"error", err,
 			)
@@ -200,34 +199,28 @@ func pbToRecord(pbRec *pb.Record) (*record.Record, error) {
 		return nil, errors.New("record is nil")
 	}
 
-	var spec, status map[string]any
+	var spec, st map[string]any
 	if pbRec.Spec != nil {
 		spec = pbRec.Spec.AsMap()
 	}
 	if pbRec.Status != nil {
-		status = pbRec.Status.AsMap()
+		st = pbRec.Status.AsMap()
 	}
 
 	return &record.Record{
-		TypeMeta: record.TypeMeta{
-			Group:   pbRec.TypeMeta.GetGroup(),
-			Version: pbRec.TypeMeta.GetVersion(),
-			Kind:    pbRec.TypeMeta.GetKind(),
-		},
+		Type: pbRec.Type,
 		ObjectMeta: record.ObjectMeta{
-			Name:            pbRec.ObjectMeta.GetName(),
-			Tradespace:      pbRec.ObjectMeta.GetTradespace(),
-			Labels:          pbRec.ObjectMeta.GetLabels(),
-			Annotations:     pbRec.ObjectMeta.GetAnnotations(),
-			ResourceVersion: pbRec.ObjectMeta.GetResourceVersion(),
+			Name:       pbRec.ObjectMeta.GetName(),
+			Tradespace: pbRec.ObjectMeta.GetTradespace(),
+			Labels:     pbRec.ObjectMeta.GetLabels(),
 		},
 		Spec:   spec,
-		Status: status,
+		Status: st,
 	}, nil
 }
 
 func recordToPB(r *record.Record) (*pb.Record, error) {
-	var spec, status *structpb.Struct
+	var spec, st *structpb.Struct
 	var err error
 
 	if r.Spec != nil {
@@ -237,29 +230,21 @@ func recordToPB(r *record.Record) (*pb.Record, error) {
 		}
 	}
 	if r.Status != nil {
-		status, err = structpb.NewStruct(r.Status)
+		st, err = structpb.NewStruct(r.Status)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &pb.Record{
-		TypeMeta: &pb.TypeMeta{
-			Group:   r.TypeMeta.Group,
-			Version: r.TypeMeta.Version,
-			Kind:    r.TypeMeta.Kind,
-		},
+		Type: r.Type,
 		ObjectMeta: &pb.ObjectMeta{
-			Name:            r.ObjectMeta.Name,
-			Tradespace:      r.ObjectMeta.Tradespace,
-			Labels:          r.ObjectMeta.Labels,
-			Annotations:     r.ObjectMeta.Annotations,
-			ResourceVersion: r.ObjectMeta.ResourceVersion,
-			CreatedAt:       timestamppb.New(r.ObjectMeta.CreatedAt),
-			UpdatedAt:       timestamppb.New(r.ObjectMeta.UpdatedAt),
+			Name:       r.ObjectMeta.Name,
+			Tradespace: r.ObjectMeta.Tradespace,
+			Labels:     r.ObjectMeta.Labels,
 		},
 		Spec:   spec,
-		Status: status,
+		Status: st,
 	}, nil
 }
 

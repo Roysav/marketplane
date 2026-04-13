@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -8,20 +8,20 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 
+	"github.com/roysav/marketplane/pkg/record"
+	"github.com/roysav/marketplane/pkg/service"
 	"github.com/roysav/marketplane/pkg/storage"
+	"github.com/roysav/marketplane/pkg/storage/postgres"
 	"github.com/roysav/marketplane/pkg/storage/redis"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
+	"github.com/roysav/marketplane/tests"
 )
 
-func newTestStreamService(t *testing.T) (*StreamService, *goredis.Client) {
+func newTestStreamService(t *testing.T) (*service.StreamService, storage.RowStorage, *goredis.Client) {
 	t.Helper()
 	ctx := context.Background()
 
-	rows, err := sqlite.New(ctx, ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create sqlite storage: %v", err)
-	}
-	t.Cleanup(func() { rows.Close() })
+	pool := tests.Pool(ctx, t)
+	rows := postgres.New(pool)
 
 	redisClient, err := redis.NewClient(ctx, redis.Options{Addr: "localhost:6379"})
 	if err != nil {
@@ -31,21 +31,20 @@ func newTestStreamService(t *testing.T) (*StreamService, *goredis.Client) {
 
 	streams := redis.NewStreamStorage(redisClient)
 
-	return NewStreamService(StreamServiceConfig{
+	svc := service.NewStreamService(service.StreamServiceConfig{
 		Rows:    rows,
 		Streams: streams,
-	}), redisClient
+	})
+	return svc, rows, redisClient
 }
 
-func createTestStreamDefinition(t *testing.T, s *StreamService, name string) StreamKey {
+func createTestStreamDefinition(t *testing.T, rows storage.RowStorage, name string) service.StreamKey {
 	t.Helper()
 	ctx := context.Background()
 
-	_, err := s.rows.Create(ctx, &storage.Row{
-		Type:       "core/v1/StreamDefinition",
-		Tradespace: "default",
-		Name:       name,
-		Data: `{
+	_, err := rows.Create(ctx, &storage.Row{
+		Key: record.Key("core/v1/StreamDefinition", "default", name),
+		Data: []byte(`{
 			"group": "Binance.MarketFeed",
 			"version": "v1alpha1",
 			"kind": "Quotes",
@@ -56,22 +55,23 @@ func createTestStreamDefinition(t *testing.T, s *StreamService, name string) Str
 					"last_price": {"type": "string"}
 				}
 			}
-		}`,
+		}`),
 	})
 	if err != nil {
 		t.Fatalf("failed to create stream definition: %v", err)
 	}
 
-	return StreamKey{
-		Name: name,
+	return service.StreamKey{
+		Tradespace: "default",
+		Name:       name,
 	}
 }
 
 func TestStreamService_AppendAndLatest(t *testing.T) {
 	ctx := context.Background()
-	s, redisClient := newTestStreamService(t)
+	s, rows, redisClient := newTestStreamService(t)
 
-	key := createTestStreamDefinition(t, s, "btcusdt")
+	key := createTestStreamDefinition(t, rows, "btcusdt")
 
 	// Clean up test stream
 	redisClient.Del(ctx, "stream:"+key.String())
@@ -98,9 +98,9 @@ func TestStreamService_AppendAndLatest(t *testing.T) {
 
 func TestStreamService_AppendValidation(t *testing.T) {
 	ctx := context.Background()
-	s, _ := newTestStreamService(t)
+	s, rows, _ := newTestStreamService(t)
 
-	key := createTestStreamDefinition(t, s, "ethusdt")
+	key := createTestStreamDefinition(t, rows, "ethusdt")
 
 	// Append without required field should fail
 	ts := time.Now()
@@ -110,16 +110,16 @@ func TestStreamService_AppendValidation(t *testing.T) {
 	if err == nil {
 		t.Error("expected validation error, got nil")
 	}
-	if !errors.Is(err, ErrStreamValidation) {
+	if !errors.Is(err, service.ErrStreamValidation) {
 		t.Errorf("expected ErrStreamValidation, got: %v", err)
 	}
 }
 
 func TestStreamService_Range(t *testing.T) {
 	ctx := context.Background()
-	s, redisClient := newTestStreamService(t)
+	s, rows, redisClient := newTestStreamService(t)
 
-	key := createTestStreamDefinition(t, s, "solusdt")
+	key := createTestStreamDefinition(t, rows, "solusdt")
 
 	// Clean up test stream
 	redisClient.Del(ctx, "stream:"+key.String())
@@ -152,9 +152,9 @@ func TestStreamService_Watch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	s, redisClient := newTestStreamService(t)
+	s, rows, redisClient := newTestStreamService(t)
 
-	key := createTestStreamDefinition(t, s, "avaxusdt")
+	key := createTestStreamDefinition(t, rows, "avaxusdt")
 
 	// Clean up test stream
 	redisClient.Del(ctx, "stream:"+key.String())
@@ -190,38 +190,40 @@ func TestStreamService_Watch(t *testing.T) {
 
 func TestStreamService_NotFound(t *testing.T) {
 	ctx := context.Background()
-	s, _ := newTestStreamService(t)
+	s, _, _ := newTestStreamService(t)
 
-	key := StreamKey{
-		Name: "missing",
+	key := service.StreamKey{
+		Tradespace: "default",
+		Name:       "missing",
 	}
 
 	_, err := s.Latest(ctx, key)
 	if err == nil {
 		t.Error("expected error, got nil")
 	}
-	if !errors.Is(err, ErrStreamNotFound) {
+	if !errors.Is(err, service.ErrStreamNotFound) {
 		t.Errorf("expected ErrStreamNotFound, got: %v", err)
 	}
 }
 
 func TestStreamService_KeyMismatch(t *testing.T) {
 	ctx := context.Background()
-	s, _ := newTestStreamService(t)
+	s, rows, _ := newTestStreamService(t)
 
 	// Create a stream definition
-	createTestStreamDefinition(t, s, "linkusdt")
+	createTestStreamDefinition(t, rows, "linkusdt")
 
-	// Try to access with wrong group/version/kind
-	key := StreamKey{
-		Name: "linkusdt",
+	// Try to access — definition exists but no data appended to Redis stream
+	key := service.StreamKey{
+		Tradespace: "default",
+		Name:       "linkusdt",
 	}
 
 	_, err := s.Latest(ctx, key)
 	if err == nil {
 		t.Error("expected error for mismatched key, got nil")
 	}
-	if !errors.Is(err, ErrStreamNotFound) {
+	if !errors.Is(err, service.ErrStreamNotFound) {
 		t.Errorf("expected ErrStreamNotFound, got: %v", err)
 	}
 }

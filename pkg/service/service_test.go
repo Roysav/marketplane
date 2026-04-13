@@ -1,34 +1,21 @@
-package service
+package service_test
 
 import (
 	"context"
 	"errors"
-	"log/slog"
-	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/roysav/marketplane/pkg/record"
-	"github.com/roysav/marketplane/pkg/storage/sqlite"
+	"github.com/roysav/marketplane/pkg/service"
+	"github.com/roysav/marketplane/tests"
 )
 
-func newTestService(t *testing.T) *Service {
+func newTestService(t *testing.T) *service.Service {
 	t.Helper()
 	ctx := context.Background()
-
-	rows, err := sqlite.New(ctx, ":memory:")
-	if err != nil {
-		t.Fatalf("failed to create storage: %v", err)
-	}
-	t.Cleanup(func() { rows.Close() })
-
-	// Use a discarding logger for tests
-	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
-
-	return New(Config{
-		Rows:   rows,
-		Events: nil, // no events for basic tests
-		Logger: logger,
-	})
+	return tests.SVC(ctx, t)
 }
 
 func TestService_CreateAndGet(t *testing.T) {
@@ -36,13 +23,13 @@ func TestService_CreateAndGet(t *testing.T) {
 	ctx := context.Background()
 
 	r := &record.Record{
-		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		Type: "core/v1/Tradespace",
 		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "test-tradespace",
 			Labels:     map[string]string{"env": "test"},
 		},
-		Spec: map[string]any{"description": "A test tradespace"},
+		Spec: map[string]any{"description": "A test tradespace", "name": "test-tradespace"},
 	}
 
 	// Create
@@ -51,8 +38,8 @@ func TestService_CreateAndGet(t *testing.T) {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if created.ObjectMeta.ResourceVersion != 1 {
-		t.Errorf("expected ResourceVersion 1, got %d", created.ObjectMeta.ResourceVersion)
+	if created.ObjectMeta.Name != "test-tradespace" {
+		t.Errorf("Expected object name %s, actual %s", "test-tradespace", created.ObjectMeta.Name)
 	}
 
 	// Get
@@ -74,7 +61,7 @@ func TestService_CreateDuplicate(t *testing.T) {
 	ctx := context.Background()
 
 	r := &record.Record{
-		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		Type: "core/v1/Tradespace",
 		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "dup-test",
@@ -88,7 +75,7 @@ func TestService_CreateDuplicate(t *testing.T) {
 	}
 
 	_, err = svc.Create(ctx, r)
-	if !errors.Is(err, ErrAlreadyExists) {
+	if !errors.Is(err, service.ErrAlreadyExists) {
 		t.Errorf("expected ErrAlreadyExists, got: %v", err)
 	}
 }
@@ -98,7 +85,7 @@ func TestService_Update(t *testing.T) {
 	ctx := context.Background()
 
 	r := &record.Record{
-		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		Type: "core/v1/Tradespace",
 		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "update-test",
@@ -117,10 +104,7 @@ func TestService_Update(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
-
-	if updated.ObjectMeta.ResourceVersion != 2 {
-		t.Errorf("expected ResourceVersion 2, got %d", updated.ObjectMeta.ResourceVersion)
-	}
+	assert.Equal(t, "updated", updated.Spec["description"])
 
 	// Verify
 	got, _ := svc.Get(ctx, "core/v1/Tradespace", "default", "update-test")
@@ -134,7 +118,7 @@ func TestService_Delete(t *testing.T) {
 	ctx := context.Background()
 
 	r := &record.Record{
-		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+		Type: "core/v1/Tradespace",
 		ObjectMeta: record.ObjectMeta{
 			Tradespace: "default",
 			Name:       "delete-test",
@@ -153,7 +137,7 @@ func TestService_Delete(t *testing.T) {
 	}
 
 	_, err = svc.Get(ctx, "core/v1/Tradespace", "default", "delete-test")
-	if !errors.Is(err, ErrNotFound) {
+	if !errors.Is(err, service.ErrNotFound) {
 		t.Errorf("expected ErrNotFound after delete, got: %v", err)
 	}
 }
@@ -165,7 +149,7 @@ func TestService_List(t *testing.T) {
 	// Create multiple records
 	for _, name := range []string{"ts-1", "ts-2", "ts-3"} {
 		r := &record.Record{
-			TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Tradespace"},
+			Type: "core/v1/Tradespace",
 			ObjectMeta: record.ObjectMeta{
 				Tradespace: "default",
 				Name:       name,
@@ -196,12 +180,12 @@ func TestService_ListByTradespace(t *testing.T) {
 	// Create records in different tradespaces
 	for _, ts := range []string{"prod", "staging", "prod"} {
 		r := &record.Record{
-			TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+			Type: "core/v1/Tradespace",
 			ObjectMeta: record.ObjectMeta{
 				Tradespace: ts,
-				Name:       "quota-" + ts + "-" + randomSuffix(),
+				Name:       "ts-" + ts + "-" + randomSuffix(),
 			},
-			Spec: map[string]any{"balances": map[string]any{"USD": "100"}},
+			Spec: map[string]any{},
 		}
 		_, err := svc.Create(ctx, r)
 		if err != nil {
@@ -210,7 +194,7 @@ func TestService_ListByTradespace(t *testing.T) {
 	}
 
 	// List only prod
-	records, err := svc.List(ctx, "core/v1/Quota", "prod", nil)
+	records, err := svc.List(ctx, "core/v1/Tradespace", "prod", nil)
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -224,9 +208,9 @@ func TestService_ValidationError(t *testing.T) {
 	svc := newTestService(t)
 	ctx := context.Background()
 
-	// Missing required field for Quota
+	// Missing required field "balances" for Quota
 	r := &record.Record{
-		TypeMeta: record.TypeMeta{Group: "core", Version: "v1", Kind: "Quota"},
+		Type: "core/v1/Quota",
 		ObjectMeta: record.ObjectMeta{
 			Tradespace: "myns",
 			Name:       "invalid-quota",
@@ -235,7 +219,7 @@ func TestService_ValidationError(t *testing.T) {
 	}
 
 	_, err := svc.Create(ctx, r)
-	if !errors.Is(err, ErrValidation) {
+	if !errors.Is(err, service.ErrValidation) {
 		t.Errorf("expected ErrValidation, got: %v", err)
 	}
 }
@@ -245,7 +229,7 @@ func TestService_GetNotFound(t *testing.T) {
 	ctx := context.Background()
 
 	_, err := svc.Get(ctx, "core/v1/Tradespace", "default", "nonexistent")
-	if !errors.Is(err, ErrNotFound) {
+	if !errors.Is(err, service.ErrNotFound) {
 		t.Errorf("expected ErrNotFound, got: %v", err)
 	}
 }

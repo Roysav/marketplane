@@ -10,7 +10,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -23,84 +22,19 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// TypeMeta describes the type of a record.
-type TypeMeta struct {
+// ObjectMeta contains metadata about a record.
+type ObjectMeta struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Group         string                 `protobuf:"bytes,1,opt,name=group,proto3" json:"group,omitempty"`
-	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
-	Kind          string                 `protobuf:"bytes,3,opt,name=kind,proto3" json:"kind,omitempty"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Tradespace    string                 `protobuf:"bytes,2,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
+	Labels        map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *TypeMeta) Reset() {
-	*x = TypeMeta{}
-	mi := &file_record_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *TypeMeta) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*TypeMeta) ProtoMessage() {}
-
-func (x *TypeMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use TypeMeta.ProtoReflect.Descriptor instead.
-func (*TypeMeta) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{0}
-}
-
-func (x *TypeMeta) GetGroup() string {
-	if x != nil {
-		return x.Group
-	}
-	return ""
-}
-
-func (x *TypeMeta) GetVersion() string {
-	if x != nil {
-		return x.Version
-	}
-	return ""
-}
-
-func (x *TypeMeta) GetKind() string {
-	if x != nil {
-		return x.Kind
-	}
-	return ""
-}
-
-// ObjectMeta contains metadata about a record.
-type ObjectMeta struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	Name            string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Tradespace      string                 `protobuf:"bytes,2,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
-	Labels          map[string]string      `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	Annotations     map[string]string      `protobuf:"bytes,4,rep,name=annotations,proto3" json:"annotations,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	ResourceVersion int64                  `protobuf:"varint,5,opt,name=resource_version,json=resourceVersion,proto3" json:"resource_version,omitempty"`
-	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
-}
-
 func (x *ObjectMeta) Reset() {
 	*x = ObjectMeta{}
-	mi := &file_record_proto_msgTypes[1]
+	mi := &file_record_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -112,7 +46,7 @@ func (x *ObjectMeta) String() string {
 func (*ObjectMeta) ProtoMessage() {}
 
 func (x *ObjectMeta) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[1]
+	mi := &file_record_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -125,7 +59,7 @@ func (x *ObjectMeta) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ObjectMeta.ProtoReflect.Descriptor instead.
 func (*ObjectMeta) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{1}
+	return file_record_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *ObjectMeta) GetName() string {
@@ -149,38 +83,10 @@ func (x *ObjectMeta) GetLabels() map[string]string {
 	return nil
 }
 
-func (x *ObjectMeta) GetAnnotations() map[string]string {
-	if x != nil {
-		return x.Annotations
-	}
-	return nil
-}
-
-func (x *ObjectMeta) GetResourceVersion() int64 {
-	if x != nil {
-		return x.ResourceVersion
-	}
-	return 0
-}
-
-func (x *ObjectMeta) GetCreatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.CreatedAt
-	}
-	return nil
-}
-
-func (x *ObjectMeta) GetUpdatedAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.UpdatedAt
-	}
-	return nil
-}
-
 // Record is the generic wrapper for all resources.
 type Record struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	TypeMeta      *TypeMeta              `protobuf:"bytes,1,opt,name=type_meta,json=typeMeta,proto3" json:"type_meta,omitempty"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
 	ObjectMeta    *ObjectMeta            `protobuf:"bytes,2,opt,name=object_meta,json=objectMeta,proto3" json:"object_meta,omitempty"`
 	Spec          *structpb.Struct       `protobuf:"bytes,3,opt,name=spec,proto3" json:"spec,omitempty"`
 	Status        *structpb.Struct       `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`
@@ -190,7 +96,7 @@ type Record struct {
 
 func (x *Record) Reset() {
 	*x = Record{}
-	mi := &file_record_proto_msgTypes[2]
+	mi := &file_record_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -202,7 +108,7 @@ func (x *Record) String() string {
 func (*Record) ProtoMessage() {}
 
 func (x *Record) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[2]
+	mi := &file_record_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -215,14 +121,14 @@ func (x *Record) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Record.ProtoReflect.Descriptor instead.
 func (*Record) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{2}
+	return file_record_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Record) GetTypeMeta() *TypeMeta {
+func (x *Record) GetType() string {
 	if x != nil {
-		return x.TypeMeta
+		return x.Type
 	}
-	return nil
+	return ""
 }
 
 func (x *Record) GetObjectMeta() *ObjectMeta {
@@ -256,7 +162,7 @@ type CreateRequest struct {
 
 func (x *CreateRequest) Reset() {
 	*x = CreateRequest{}
-	mi := &file_record_proto_msgTypes[3]
+	mi := &file_record_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -268,7 +174,7 @@ func (x *CreateRequest) String() string {
 func (*CreateRequest) ProtoMessage() {}
 
 func (x *CreateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[3]
+	mi := &file_record_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -281,7 +187,7 @@ func (x *CreateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRequest.ProtoReflect.Descriptor instead.
 func (*CreateRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{3}
+	return file_record_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateRequest) GetRecord() *Record {
@@ -301,7 +207,7 @@ type CreateResponse struct {
 
 func (x *CreateResponse) Reset() {
 	*x = CreateResponse{}
-	mi := &file_record_proto_msgTypes[4]
+	mi := &file_record_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -313,7 +219,7 @@ func (x *CreateResponse) String() string {
 func (*CreateResponse) ProtoMessage() {}
 
 func (x *CreateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[4]
+	mi := &file_record_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -326,7 +232,7 @@ func (x *CreateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateResponse.ProtoReflect.Descriptor instead.
 func (*CreateResponse) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{4}
+	return file_record_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateResponse) GetRecord() *Record {
@@ -348,7 +254,7 @@ type GetRequest struct {
 
 func (x *GetRequest) Reset() {
 	*x = GetRequest{}
-	mi := &file_record_proto_msgTypes[5]
+	mi := &file_record_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -360,7 +266,7 @@ func (x *GetRequest) String() string {
 func (*GetRequest) ProtoMessage() {}
 
 func (x *GetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[5]
+	mi := &file_record_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -373,7 +279,7 @@ func (x *GetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRequest.ProtoReflect.Descriptor instead.
 func (*GetRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{5}
+	return file_record_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *GetRequest) GetType() string {
@@ -407,7 +313,7 @@ type GetResponse struct {
 
 func (x *GetResponse) Reset() {
 	*x = GetResponse{}
-	mi := &file_record_proto_msgTypes[6]
+	mi := &file_record_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -419,7 +325,7 @@ func (x *GetResponse) String() string {
 func (*GetResponse) ProtoMessage() {}
 
 func (x *GetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[6]
+	mi := &file_record_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -432,7 +338,7 @@ func (x *GetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetResponse.ProtoReflect.Descriptor instead.
 func (*GetResponse) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{6}
+	return file_record_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *GetResponse) GetRecord() *Record {
@@ -452,7 +358,7 @@ type UpdateRequest struct {
 
 func (x *UpdateRequest) Reset() {
 	*x = UpdateRequest{}
-	mi := &file_record_proto_msgTypes[7]
+	mi := &file_record_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -464,7 +370,7 @@ func (x *UpdateRequest) String() string {
 func (*UpdateRequest) ProtoMessage() {}
 
 func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[7]
+	mi := &file_record_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -477,7 +383,7 @@ func (x *UpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{7}
+	return file_record_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdateRequest) GetRecord() *Record {
@@ -497,7 +403,7 @@ type UpdateResponse struct {
 
 func (x *UpdateResponse) Reset() {
 	*x = UpdateResponse{}
-	mi := &file_record_proto_msgTypes[8]
+	mi := &file_record_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -509,7 +415,7 @@ func (x *UpdateResponse) String() string {
 func (*UpdateResponse) ProtoMessage() {}
 
 func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[8]
+	mi := &file_record_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -522,7 +428,7 @@ func (x *UpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateResponse) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{8}
+	return file_record_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *UpdateResponse) GetRecord() *Record {
@@ -544,7 +450,7 @@ type DeleteRequest struct {
 
 func (x *DeleteRequest) Reset() {
 	*x = DeleteRequest{}
-	mi := &file_record_proto_msgTypes[9]
+	mi := &file_record_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -556,7 +462,7 @@ func (x *DeleteRequest) String() string {
 func (*DeleteRequest) ProtoMessage() {}
 
 func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[9]
+	mi := &file_record_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -569,7 +475,7 @@ func (x *DeleteRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{9}
+	return file_record_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *DeleteRequest) GetType() string {
@@ -602,7 +508,7 @@ type DeleteResponse struct {
 
 func (x *DeleteResponse) Reset() {
 	*x = DeleteResponse{}
-	mi := &file_record_proto_msgTypes[10]
+	mi := &file_record_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -614,7 +520,7 @@ func (x *DeleteResponse) String() string {
 func (*DeleteResponse) ProtoMessage() {}
 
 func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[10]
+	mi := &file_record_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -627,7 +533,7 @@ func (x *DeleteResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteResponse.ProtoReflect.Descriptor instead.
 func (*DeleteResponse) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{10}
+	return file_record_proto_rawDescGZIP(), []int{9}
 }
 
 // ListRequest is the request for List.
@@ -642,7 +548,7 @@ type ListRequest struct {
 
 func (x *ListRequest) Reset() {
 	*x = ListRequest{}
-	mi := &file_record_proto_msgTypes[11]
+	mi := &file_record_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -654,7 +560,7 @@ func (x *ListRequest) String() string {
 func (*ListRequest) ProtoMessage() {}
 
 func (x *ListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[11]
+	mi := &file_record_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -667,7 +573,7 @@ func (x *ListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRequest.ProtoReflect.Descriptor instead.
 func (*ListRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{11}
+	return file_record_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListRequest) GetType() string {
@@ -701,7 +607,7 @@ type ListResponse struct {
 
 func (x *ListResponse) Reset() {
 	*x = ListResponse{}
-	mi := &file_record_proto_msgTypes[12]
+	mi := &file_record_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -713,7 +619,7 @@ func (x *ListResponse) String() string {
 func (*ListResponse) ProtoMessage() {}
 
 func (x *ListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[12]
+	mi := &file_record_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -726,7 +632,7 @@ func (x *ListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListResponse.ProtoReflect.Descriptor instead.
 func (*ListResponse) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{12}
+	return file_record_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListResponse) GetRecords() []*Record {
@@ -746,7 +652,7 @@ type WatchRequest struct {
 
 func (x *WatchRequest) Reset() {
 	*x = WatchRequest{}
-	mi := &file_record_proto_msgTypes[13]
+	mi := &file_record_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -758,7 +664,7 @@ func (x *WatchRequest) String() string {
 func (*WatchRequest) ProtoMessage() {}
 
 func (x *WatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[13]
+	mi := &file_record_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -771,7 +677,7 @@ func (x *WatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchRequest.ProtoReflect.Descriptor instead.
 func (*WatchRequest) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{13}
+	return file_record_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *WatchRequest) GetType() string {
@@ -792,7 +698,7 @@ type WatchEvent struct {
 
 func (x *WatchEvent) Reset() {
 	*x = WatchEvent{}
-	mi := &file_record_proto_msgTypes[14]
+	mi := &file_record_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -804,7 +710,7 @@ func (x *WatchEvent) String() string {
 func (*WatchEvent) ProtoMessage() {}
 
 func (x *WatchEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_record_proto_msgTypes[14]
+	mi := &file_record_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -817,7 +723,7 @@ func (x *WatchEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WatchEvent.ProtoReflect.Descriptor instead.
 func (*WatchEvent) Descriptor() ([]byte, []int) {
-	return file_record_proto_rawDescGZIP(), []int{14}
+	return file_record_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *WatchEvent) GetAction() string {
@@ -838,32 +744,19 @@ var File_record_proto protoreflect.FileDescriptor
 
 const file_record_proto_rawDesc = "" +
 	"\n" +
-	"\frecord.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"N\n" +
-	"\bTypeMeta\x12\x14\n" +
-	"\x05group\x18\x01 \x01(\tR\x05group\x12\x18\n" +
-	"\aversion\x18\x02 \x01(\tR\aversion\x12\x12\n" +
-	"\x04kind\x18\x03 \x01(\tR\x04kind\"\xeb\x03\n" +
+	"\frecord.proto\x12\x0emarketplane.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xbb\x01\n" +
 	"\n" +
 	"ObjectMeta\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1e\n" +
 	"\n" +
 	"tradespace\x18\x02 \x01(\tR\n" +
 	"tradespace\x12>\n" +
-	"\x06labels\x18\x03 \x03(\v2&.marketplane.v1.ObjectMeta.LabelsEntryR\x06labels\x12M\n" +
-	"\vannotations\x18\x04 \x03(\v2+.marketplane.v1.ObjectMeta.AnnotationsEntryR\vannotations\x12)\n" +
-	"\x10resource_version\x18\x05 \x01(\x03R\x0fresourceVersion\x129\n" +
-	"\n" +
-	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
-	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x1a9\n" +
+	"\x06labels\x18\x03 \x03(\v2&.marketplane.v1.ObjectMeta.LabelsEntryR\x06labels\x1a9\n" +
 	"\vLabelsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a>\n" +
-	"\x10AnnotationsEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xda\x01\n" +
-	"\x06Record\x125\n" +
-	"\ttype_meta\x18\x01 \x01(\v2\x18.marketplane.v1.TypeMetaR\btypeMeta\x12;\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb7\x01\n" +
+	"\x06Record\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12;\n" +
 	"\vobject_meta\x18\x02 \x01(\v2\x1a.marketplane.v1.ObjectMetaR\n" +
 	"objectMeta\x12+\n" +
 	"\x04spec\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04spec\x12/\n" +
@@ -929,63 +822,56 @@ func file_record_proto_rawDescGZIP() []byte {
 	return file_record_proto_rawDescData
 }
 
-var file_record_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_record_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_record_proto_goTypes = []any{
-	(*TypeMeta)(nil),              // 0: marketplane.v1.TypeMeta
-	(*ObjectMeta)(nil),            // 1: marketplane.v1.ObjectMeta
-	(*Record)(nil),                // 2: marketplane.v1.Record
-	(*CreateRequest)(nil),         // 3: marketplane.v1.CreateRequest
-	(*CreateResponse)(nil),        // 4: marketplane.v1.CreateResponse
-	(*GetRequest)(nil),            // 5: marketplane.v1.GetRequest
-	(*GetResponse)(nil),           // 6: marketplane.v1.GetResponse
-	(*UpdateRequest)(nil),         // 7: marketplane.v1.UpdateRequest
-	(*UpdateResponse)(nil),        // 8: marketplane.v1.UpdateResponse
-	(*DeleteRequest)(nil),         // 9: marketplane.v1.DeleteRequest
-	(*DeleteResponse)(nil),        // 10: marketplane.v1.DeleteResponse
-	(*ListRequest)(nil),           // 11: marketplane.v1.ListRequest
-	(*ListResponse)(nil),          // 12: marketplane.v1.ListResponse
-	(*WatchRequest)(nil),          // 13: marketplane.v1.WatchRequest
-	(*WatchEvent)(nil),            // 14: marketplane.v1.WatchEvent
-	nil,                           // 15: marketplane.v1.ObjectMeta.LabelsEntry
-	nil,                           // 16: marketplane.v1.ObjectMeta.AnnotationsEntry
-	nil,                           // 17: marketplane.v1.ListRequest.LabelsEntry
-	(*timestamppb.Timestamp)(nil), // 18: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),       // 19: google.protobuf.Struct
+	(*ObjectMeta)(nil),      // 0: marketplane.v1.ObjectMeta
+	(*Record)(nil),          // 1: marketplane.v1.Record
+	(*CreateRequest)(nil),   // 2: marketplane.v1.CreateRequest
+	(*CreateResponse)(nil),  // 3: marketplane.v1.CreateResponse
+	(*GetRequest)(nil),      // 4: marketplane.v1.GetRequest
+	(*GetResponse)(nil),     // 5: marketplane.v1.GetResponse
+	(*UpdateRequest)(nil),   // 6: marketplane.v1.UpdateRequest
+	(*UpdateResponse)(nil),  // 7: marketplane.v1.UpdateResponse
+	(*DeleteRequest)(nil),   // 8: marketplane.v1.DeleteRequest
+	(*DeleteResponse)(nil),  // 9: marketplane.v1.DeleteResponse
+	(*ListRequest)(nil),     // 10: marketplane.v1.ListRequest
+	(*ListResponse)(nil),    // 11: marketplane.v1.ListResponse
+	(*WatchRequest)(nil),    // 12: marketplane.v1.WatchRequest
+	(*WatchEvent)(nil),      // 13: marketplane.v1.WatchEvent
+	nil,                     // 14: marketplane.v1.ObjectMeta.LabelsEntry
+	nil,                     // 15: marketplane.v1.ListRequest.LabelsEntry
+	(*structpb.Struct)(nil), // 16: google.protobuf.Struct
 }
 var file_record_proto_depIdxs = []int32{
-	15, // 0: marketplane.v1.ObjectMeta.labels:type_name -> marketplane.v1.ObjectMeta.LabelsEntry
-	16, // 1: marketplane.v1.ObjectMeta.annotations:type_name -> marketplane.v1.ObjectMeta.AnnotationsEntry
-	18, // 2: marketplane.v1.ObjectMeta.created_at:type_name -> google.protobuf.Timestamp
-	18, // 3: marketplane.v1.ObjectMeta.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 4: marketplane.v1.Record.type_meta:type_name -> marketplane.v1.TypeMeta
-	1,  // 5: marketplane.v1.Record.object_meta:type_name -> marketplane.v1.ObjectMeta
-	19, // 6: marketplane.v1.Record.spec:type_name -> google.protobuf.Struct
-	19, // 7: marketplane.v1.Record.status:type_name -> google.protobuf.Struct
-	2,  // 8: marketplane.v1.CreateRequest.record:type_name -> marketplane.v1.Record
-	2,  // 9: marketplane.v1.CreateResponse.record:type_name -> marketplane.v1.Record
-	2,  // 10: marketplane.v1.GetResponse.record:type_name -> marketplane.v1.Record
-	2,  // 11: marketplane.v1.UpdateRequest.record:type_name -> marketplane.v1.Record
-	2,  // 12: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
-	17, // 13: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
-	2,  // 14: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
-	2,  // 15: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
-	3,  // 16: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
-	5,  // 17: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
-	7,  // 18: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
-	9,  // 19: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
-	11, // 20: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
-	13, // 21: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
-	4,  // 22: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
-	6,  // 23: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
-	8,  // 24: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
-	10, // 25: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
-	12, // 26: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
-	14, // 27: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
-	22, // [22:28] is the sub-list for method output_type
-	16, // [16:22] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	14, // 0: marketplane.v1.ObjectMeta.labels:type_name -> marketplane.v1.ObjectMeta.LabelsEntry
+	0,  // 1: marketplane.v1.Record.object_meta:type_name -> marketplane.v1.ObjectMeta
+	16, // 2: marketplane.v1.Record.spec:type_name -> google.protobuf.Struct
+	16, // 3: marketplane.v1.Record.status:type_name -> google.protobuf.Struct
+	1,  // 4: marketplane.v1.CreateRequest.record:type_name -> marketplane.v1.Record
+	1,  // 5: marketplane.v1.CreateResponse.record:type_name -> marketplane.v1.Record
+	1,  // 6: marketplane.v1.GetResponse.record:type_name -> marketplane.v1.Record
+	1,  // 7: marketplane.v1.UpdateRequest.record:type_name -> marketplane.v1.Record
+	1,  // 8: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
+	15, // 9: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
+	1,  // 10: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
+	1,  // 11: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
+	2,  // 12: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
+	4,  // 13: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
+	6,  // 14: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
+	8,  // 15: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
+	10, // 16: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
+	12, // 17: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
+	3,  // 18: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
+	5,  // 19: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
+	7,  // 20: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
+	9,  // 21: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
+	11, // 22: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
+	13, // 23: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
+	18, // [18:24] is the sub-list for method output_type
+	12, // [12:18] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_record_proto_init() }
@@ -999,7 +885,7 @@ func file_record_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_record_proto_rawDesc), len(file_record_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   18,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

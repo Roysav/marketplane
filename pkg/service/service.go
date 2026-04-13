@@ -11,7 +11,6 @@ import (
 
 	"github.com/roysav/marketplane/pkg/record"
 	"github.com/roysav/marketplane/pkg/storage"
-	"github.com/roysav/marketplane/pkg/validator"
 )
 
 var (
@@ -23,16 +22,17 @@ var (
 
 // Config holds configuration for the Service.
 type Config struct {
-	Rows   storage.RowStorage
-	Events storage.EventStorage // optional, enables watch/events
-	Logger *slog.Logger         // optional, defaults to slog.Default()
+	Rows      storage.RowStorage
+	Events    storage.EventStorage
+	Validator *record.Validator
+	Logger    *slog.Logger // optional, defaults to slog.Default()
 }
 
 // Service provides operations on records.
 type Service struct {
 	rows      storage.RowStorage
 	events    storage.EventStorage
-	validator *validator.Validator
+	validator *record.Validator
 	logger    *slog.Logger
 }
 
@@ -46,25 +46,21 @@ func New(cfg Config) *Service {
 	return &Service{
 		rows:      cfg.Rows,
 		events:    cfg.Events,
-		validator: validator.New(cfg.Rows),
+		validator: cfg.Validator,
 		logger:    logger.With("component", "service"),
 	}
 }
 
 // Create creates a new record.
 func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
-	// Validate scope (tradespace vs global)
-	if err := s.validator.ValidateScope(ctx, r); err != nil {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidScope, err)
-	}
 
 	// Validate the record spec against schema
-	if err := s.validator.Validate(ctx, r); err != nil {
+	if err := s.validator.Validate(r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 
 	// Convert to row
-	row, err := recordToRow(r)
+	row, err := r.ToRow()
 	if err != nil {
 		return nil, err
 	}
@@ -81,16 +77,12 @@ func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record,
 	// Publish event
 	s.publishEvent(ctx, "created", r)
 
-	return rowToRecord(created)
+	return record.RecordFromRow(created)
 }
 
 // Get retrieves a record by key.
 func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*record.Record, error) {
-	row, err := s.rows.Get(ctx, storage.Key{
-		Type:       typeStr,
-		Tradespace: tradespace,
-		Name:       name,
-	})
+	row, err := s.rows.Get(ctx, record.Key(typeStr, tradespace, name))
 	if err != nil {
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s %s/%s", ErrNotFound, typeStr, tradespace, name)
@@ -98,24 +90,21 @@ func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*r
 		return nil, err
 	}
 
-	return rowToRecord(row)
+	return record.RecordFromRow(row)
 }
 
 // Update updates an existing record.
 func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record, error) {
-	// Validate the record
-	if err := s.validator.Validate(ctx, r); err != nil {
+	if err := s.validator.Validate(r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
 
-	// Convert to row
-	row, err := recordToRow(r)
+	row, err := r.ToRow()
 	if err != nil {
 		return nil, err
 	}
 
-	// Update
-	updated, err := s.rows.Update(ctx, row)
+	row, err = s.rows.Update(ctx, row)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
@@ -126,16 +115,12 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 	// Publish event
 	s.publishEvent(ctx, "updated", r)
 
-	return rowToRecord(updated)
+	return record.RecordFromRow(row)
 }
 
 // Delete removes a record.
 func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) error {
-	err := s.rows.Delete(ctx, storage.Key{
-		Type:       typeStr,
-		Tradespace: tradespace,
-		Name:       name,
-	})
+	err := s.rows.Delete(ctx, record.Key(typeStr, tradespace, name))
 	if err != nil {
 		if isNotFound(err) {
 			return fmt.Errorf("%w: %s %s/%s", ErrNotFound, typeStr, tradespace, name)
@@ -145,7 +130,7 @@ func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) 
 
 	// Publish event
 	s.publishEvent(ctx, "deleted", &record.Record{
-		TypeMeta:   record.TypeMetaFromType(typeStr),
+		Type:       typeStr,
 		ObjectMeta: record.ObjectMeta{Tradespace: tradespace, Name: name},
 	})
 
@@ -155,22 +140,21 @@ func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) 
 // List returns records matching the query.
 func (s *Service) List(ctx context.Context, typeStr string, tradespace string, labels map[string]string) ([]*record.Record, error) {
 	rows, err := s.rows.List(ctx, storage.Query{
-		Type:       typeStr,
-		Tradespace: tradespace,
-		Labels:     labels,
-	})
+		Prefix: record.Key(typeStr, tradespace, ""),
+		Labels: labels,
+		Limit:  0,
+	},
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	records := make([]*record.Record, 0, len(rows))
 	for _, row := range rows {
-		r, err := rowToRecord(row)
+		r, err := record.RecordFromRow(row)
 		if err != nil {
 			s.logger.Warn("skipping row: conversion failed",
-				"type", row.Type,
-				"tradespace", row.Tradespace,
-				"name", row.Name,
+				"row", row,
 				"error", err,
 			)
 			continue
@@ -195,21 +179,20 @@ func (s *Service) publishEvent(ctx context.Context, action string, r *record.Rec
 		return
 	}
 
-	typeStr := r.TypeMeta.GVK().Type()
 	event := map[string]any{
 		"action":     action,
-		"type":       typeStr,
+		"type":       r.Type,
 		"tradespace": r.ObjectMeta.Tradespace,
 		"name":       r.ObjectMeta.Name,
 	}
 	data, _ := json.Marshal(event)
-	topic := eventTopic(typeStr)
+	topic := eventTopic(r.Type)
 
 	_, err := s.events.Publish(ctx, topic, string(data))
 	if err != nil {
 		s.logger.Warn("failed to publish event",
 			"action", action,
-			"type", typeStr,
+			"type", r.Type,
 			"tradespace", r.ObjectMeta.Tradespace,
 			"name", r.ObjectMeta.Name,
 			"error", err,
@@ -217,7 +200,7 @@ func (s *Service) publishEvent(ctx context.Context, action string, r *record.Rec
 	} else {
 		s.logger.Debug("published event",
 			"action", action,
-			"type", typeStr,
+			"type", r.Type,
 			"tradespace", r.ObjectMeta.Tradespace,
 			"name", r.ObjectMeta.Name,
 		)
@@ -226,54 +209,6 @@ func (s *Service) publishEvent(ctx context.Context, action string, r *record.Rec
 
 func eventTopic(typeStr string) string {
 	return "record:" + typeStr
-}
-
-func recordToRow(r *record.Record) (*storage.Row, error) {
-	data, err := json.Marshal(map[string]any{
-		"spec":   r.Spec,
-		"status": r.Status,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal record data: %w", err)
-	}
-	tradespace := r.ObjectMeta.Tradespace
-	if tradespace == "" {
-		tradespace = "default"
-	}
-	return &storage.Row{
-		Type:            r.TypeMeta.GVK().Type(),
-		Tradespace:      tradespace,
-		Name:            r.ObjectMeta.Name,
-		Labels:          r.ObjectMeta.Labels,
-		Data:            string(data),
-		ResourceVersion: r.ObjectMeta.ResourceVersion,
-	}, nil
-}
-
-func rowToRecord(row *storage.Row) (*record.Record, error) {
-	var data struct {
-		Spec   map[string]any `json:"spec"`
-		Status map[string]any `json:"status"`
-	}
-	if row.Data != "" {
-		if err := json.Unmarshal([]byte(row.Data), &data); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal record data: %w", err)
-		}
-	}
-
-	return &record.Record{
-		TypeMeta: record.TypeMetaFromType(row.Type),
-		ObjectMeta: record.ObjectMeta{
-			Tradespace:      row.Tradespace,
-			Name:            row.Name,
-			Labels:          row.Labels,
-			ResourceVersion: row.ResourceVersion,
-			CreatedAt:       row.CreatedAt,
-			UpdatedAt:       row.UpdatedAt,
-		},
-		Spec:   data.Spec,
-		Status: data.Status,
-	}, nil
 }
 
 func isNotFound(err error) bool {
