@@ -2,7 +2,7 @@
 
 ## Goal
 
-Add a `polymarket-order-controller` that reconciles `polymarket/v1/Order` records into real Polymarket CLOB orders, keeps local status in sync from both WebSocket and REST, and manages the matching `core/v1/Allocation` named `polymarket-order-{order-object-name}` in the same tradespace plus any compensating cleanup allocations needed to release reserved balance.
+Add a `polymarket-order-controller` that reconciles `polymarket/v1/Order` records into real Polymarket CLOB orders, materializes derived `polymarket/v1/Trade` records for each external `tradeID`, keeps local status in sync from both WebSocket and REST, and manages the matching `core/v1/Allocation` named `polymarket-order-{order-object-name}` in the same tradespace plus any compensating cleanup allocations needed to release reserved balance.
 
 This plan assumes we follow the existing repo shape:
 
@@ -11,7 +11,7 @@ This plan assumes we follow the existing repo shape:
 - binaries in `cmd/*`
 - controller-specific schemas and fixtures in `controllers/polymarket/*`
 
-## Important External Constraint
+## Authentication NOTE
 
 Polymarket order creation cannot be done with API credentials alone.
 
@@ -66,6 +66,11 @@ If that assumption is wrong, order placement must be split into a separate signe
 - top-level `orderType`
 - top-level `deferExec`
 
+Implementation note from `py-clob-client`:
+
+- the request body's top-level `owner` should be set to the API key ID
+- in practice this means `owner = POLY_API_KEY`, not a separate env var
+
 `POST /order` response returns:
 
 - `success`
@@ -114,6 +119,8 @@ Trade status lifecycle:
 - `RETRYING`
 - `FAILED`
 
+These trade statuses should live on derived `polymarket/v1/Trade` records instead of being collapsed into the top-level order state machine.
+
 ### REST Sync
 
 `GET /data/orders` returns open orders only, paginated by `next_cursor`, and includes:
@@ -157,7 +164,8 @@ This metadata is required to build the exact signed payload and to avoid avoidab
 Two existing platform limits shape this controller plan:
 
 1. Direct `Delete` is unsafe for controller-managed remote resources until Marketplane has record finalizers.
-   For `polymarket/v1/Order`, the supported delete path is `spec.desiredState = "DELETED"`.
+   For `polymarket/v1/Order`, Phase 1 does not provide a declarative cancel/delete field in spec.
+   `spec.active` only gates initial submission and does not mean "cancel" or "delete".
    Raw `Delete` RPC usage should be treated as an unsupported destructive action for now.
 2. Record updates are still full-object overwrites.
    Until Marketplane gains resource versions / three-way merge, controller status writes are best-effort and may race user edits.
@@ -172,23 +180,21 @@ Until Marketplane has resource versions / three-way merge, this controller shoul
 - the controller also owns child `core/v1/Allocation` records derived from the order
 
 Phase 1 mutability rules:
-
-- before remote submission, users may edit the order spec to fix validation failures
-- after the order reaches `PendingSubmit`, all economic fields become immutable
-- after `status.polymarketOrderID` exists, the only supported spec change is `desiredState`
-- changing price, size, side, market, or asset after submission is out of scope for Phase 1 and should eventually be modeled as cancel + replace
+- `active` is the only supported spec field that may change after creation
+- `active: false -> true` is supported before the first successful remote submit
+- once `status.polymarketOrderID` exists, the order spec should be treated as immutable in Phase 1
 
 Phase 1 write rules:
 
 - the controller must serialize reconciliation per order key so WS events, REST sync, and local retries do not race each other
 - before writing status, the controller should re-read the latest order record and preserve the latest `spec` unchanged
 - status writes should only merge controller-owned status fields and should never rewrite user-authored spec fields
-- if the latest record already requests `desiredState = CANCELED|DELETED`, the controller should preserve that intent and reconcile toward cleanup rather than writing an older active view
+- if the latest record still has `active = false` and no remote order has been submitted yet, the controller should preserve that draft intent rather than racing ahead with allocation or submission
 
 Residual risk:
 
 - a user edit can still land between the controller read and controller update because the storage layer does not yet provide CAS
-- Phase 1 reduces this risk by making submitted specs effectively immutable except for `desiredState`
+- Phase 1 reduces this risk by making submitted specs effectively immutable after the first successful remote submit
 - full correctness for concurrent spec/status writers still depends on future resource-version / three-way-merge support
 
 ## Key Design Decision
@@ -198,9 +204,18 @@ Use two layers of status:
 1. `status.state`
    Controller-owned lifecycle state used by reconciliation.
 2. `status.external.*`
-   Raw Polymarket fields copied from REST/WS responses without collapsing them too early.
+    Raw Polymarket fields copied from REST/WS responses without collapsing them too early.
 
-This keeps the controller deterministic while preserving the real exchange state for debugging.
+This keeps the controller deterministic while preserving the real exchange state for calculations such as **max potential exposure**.
+
+Use two resource layers:
+
+1. `polymarket/v1/Order`
+   User intent plus controller-owned remote-order lifecycle.
+2. `polymarket/v1/Trade`
+   Controller-owned projection of each Polymarket trade keyed by external `tradeID`.
+
+This keeps trade-settlement lifecycle separate from order lifecycle and gives reconciliation a stable idempotency key for fills.
 
 ## Proposed Repo Layout
 
@@ -215,18 +230,6 @@ This keeps the controller deterministic while preserving the real exchange state
 - `pkg/polymarket/types.go`
 - `cmd/polymarket-order-controller/main.go`
 
-### Controller Assets
-
-- `controllers/polymarket/schemas/order.metarecord.json`
-- `controllers/polymarket/schemas/order-status.md`
-- `controllers/polymarket/fixtures/ws-order-event.json`
-- `controllers/polymarket/fixtures/ws-trade-event.json`
-- `controllers/polymarket/fixtures/rest-post-order-response.json`
-- `controllers/polymarket/fixtures/rest-get-user-orders-page.json`
-- `controllers/polymarket/fixtures/rest-cancel-response.json`
-
-The first implementation can start with placeholder fixture files and the real runtime code can be built against those recorded payload shapes.
-
 ## Proposed `polymarket/v1/Order` Record
 
 ### MetaRecord
@@ -239,42 +242,38 @@ Recommended spec:
 
 ```json
 {
-  "market": "0x-condition-id",
   "assetId": "token-id",
   "side": "BUY",
   "price": "0.57",
   "size": "10",
   "orderType": "GTC",
-  "expiration": "0",
-  "outcome": "YES",
-  "desiredState": "ACTIVE",
-  "deferExec": false
+  "expiration": 17.... | null,
+  "active": true
 }
 ```
 
 Required:
 
-- `market`
 - `assetId`
 - `side` enum `BUY|SELL`
 - `price` decimal string
 - `size` decimal string
-- `orderType` enum `GTC|FOK|GTD|FAK`
+- `orderType` enum `GTC|FOK|GTD|FAK`  (default `GTC`)
+- `active` boolean
 
 Optional:
 
 - `expiration`
-- `outcome`
-- `desiredState` enum `ACTIVE|CANCELED|DELETED`
-- `deferExec`
 
 Notes:
 
 - Keep monetary and size values as strings, not floats.
-- `desiredState` is important because the current record system does not yet have finalizers, so hard delete is not safely interceptable.
-- `DELETED` should mean "controller should cancel remote order and release allocation, then leave the record in terminal `PendingDeletion`/`Deleted` until actual finalizers exist."
+- `active = false` means "draft / do not submit yet".
+- `active = true` means the controller may allocate and submit the order if it has not already done so.
+- `active` is a creation gate, not a cancellation signal.
+- `spec.active` may remain `true` even if `status.state` later becomes `Canceled`, `Expired`, `Rejected`, or `Failed`.
 - Direct `Delete` of `polymarket/v1/Order` remains unsafe until finalizers exist.
-  For now, clients and tooling should treat `spec.desiredState = "DELETED"` as the only supported deletion path.
+  In Phase 1 there is no safe declarative delete path in spec.
 
 ### Status
 
@@ -284,16 +283,13 @@ Recommended status:
 {
   "state": "Pending",
   "message": "",
-  "allocationName": "polymarket-order-my-order",
-  "allocationPhase": "approved",
   "polymarketOrderID": "0x...",
   "external": {
     "orderID": "0x...",
     "orderStatus": "live",
     "lastOrderEventType": "PLACEMENT",
-    "lastTradeStatus": "MATCHED",
     "makerAddress": "0x...",
-    "owner": "uuid",
+    "owner": "api-key-id",
     "market": "0x-condition-id",
     "assetId": "token-id",
     "side": "BUY",
@@ -317,33 +313,115 @@ Notes:
 
 - `polymarketOrderID` is the controller's canonical remote identifier, copied from the `POST /order` response.
 - `external.orderID` preserves the raw Polymarket field as returned by REST/WS payloads.
+- trade lifecycle is tracked on child `polymarket/v1/Trade` records, not folded into `Order.status.state`
 
-## Controller State Machine
+## Proposed `polymarket/v1/Trade` Record
+
+### MetaRecord
+
+Add a controller-owned `core/v1/MetaRecord` for `polymarket/v1/Trade`.
+
+This record is not user-authored intent. It is a deterministic projection created by the controller when Polymarket emits or backfills a `tradeID`.
+
+Recommended naming:
+
+- `metadata.name = polymarket-trade-{tradeID}`
+- same tradespace as the parent `polymarket/v1/Order`
+
+Recommended labels:
+
+- `polymarket.marketplane.io/order-name = <local order name>`
+- `polymarket.marketplane.io/order-id = <polymarketOrderID>`
+- `polymarket.marketplane.io/trade-id = <tradeID>`
+
+### Spec
+
+Recommended immutable spec:
+
+```json
+{
+  "orderName": "my-order",
+  "polymarketOrderID": "0x...",
+  "tradeID": "trade-123",
+  "market": "0x-condition-id",
+  "assetId": "token-id",
+  "side": "BUY",
+  "price": "0.57",
+  "size": "3",
+  "makerAddress": "0x..."
+}
+```
+
+Required:
+
+- `orderName`
+- `polymarketOrderID`
+- `tradeID`
+- `market`
+- `assetId`
+- `side` enum `BUY|SELL`
+- `price` decimal string
+- `size` decimal string
+
+Notes:
+
+- the immutable `tradeID` is the reconciliation key for websocket replay and REST backfill
+- the controller should create this record once and then treat the spec as immutable
+
+### Status
+
+Recommended status:
+
+```json
+{
+  "state": "Matched",
+  "message": "",
+  "settlementAllocationName": "",
+  "settlementApplied": false,
+  "external": {
+    "tradeID": "trade-123",
+    "tradeStatus": "MATCHED",
+    "transactionHash": "0x...",
+    "matchTime": "2026-04-13T00:00:00Z"
+  },
+  "observedAt": {
+    "restSync": "2026-04-13T00:00:00Z",
+    "wsEvent": "2026-04-13T00:00:00Z"
+  }
+}
+```
+
+Notes:
+
+- `status.state` mirrors the controller-owned trade lifecycle
+- `status.external.tradeStatus` preserves the raw Polymarket trade status string
+- `settlementApplied` becomes true only after the controller has created the settlement `core/v1/Allocation`
+- `FAILED` is terminal for the trade record and should not create settlement credit
+
+## Order Controller State Machine
 
 Recommended controller-owned `status.state` values:
 
+- `Draft`
 - `Pending`
 - `PendingAllocation`
 - `PendingSubmit`
 - `Submitting`
 - `Live`
 - `Delayed`
-- `PartiallyMatched`
+- `PartiallyFilled`
 - `Matched`
-- `Confirmed`
-- `Retrying`
-- `PendingCancel`
 - `Canceled`
 - `Expired`
 - `Rejected`
 - `Failed`
-- `PendingDeletion`
-- `Deleted`
 
 ### State Semantics
 
+- `Draft`
+  Record exists locally with `spec.active = false`; controller does not allocate or submit.
 - `Pending`
-  Order exists locally, allocation not yet created.
+  Order exists locally with `spec.active = true`, allocation not yet created.
 - `PendingAllocation`
   Allocation exists but is not yet approved.
 - `PendingSubmit`
@@ -354,34 +432,26 @@ Recommended controller-owned `status.state` values:
   Remote order is resting on the book.
 - `Delayed`
   Polymarket accepted the order but delayed matching.
-- `PartiallyMatched`
+- `PartiallyFilled`
   `size_matched > 0` and still open.
 - `Matched`
-  Fully matched but settlement not yet confirmed.
-- `Confirmed`
-  Trade confirmed onchain.
-- `Retrying`
-  Trade retry in progress.
-- `PendingCancel`
-  User requested cancel or delete; remote cancel not yet confirmed.
+  Fully matched on the venue. Per-trade settlement confirmation is tracked on `polymarket/v1/Trade`.
 - `Canceled`
-  Remote cancel confirmed.
+  Remote order was canceled on the venue while `spec.active` may still remain `true`.
 - `Expired`
   GTD order expired.
 - `Rejected`
   Local validation or exchange processing rejected the order.
 - `Failed`
-  Terminal external failure.
-- `PendingDeletion`
-  Desired state is delete; cancellation/allocation cleanup still in progress.
-- `Deleted`
-  Cleanup complete, record safe to remove once finalizers exist.
+  Terminal controller or exchange failure for the order lifecycle.
 
 ### Suggested Transition Skeleton
 
 ```mermaid
 stateDiagram-v2
+    [*] --> Draft
     [*] --> Pending
+    Draft --> Pending
     Pending --> PendingAllocation
     PendingAllocation --> PendingSubmit
     PendingSubmit --> Submitting
@@ -389,21 +459,38 @@ stateDiagram-v2
     Submitting --> Delayed
     Submitting --> Matched
     Submitting --> Rejected
-    Live --> PartiallyMatched
-    PartiallyMatched --> Matched
-    Matched --> Confirmed
-    Matched --> Retrying
-    Retrying --> Confirmed
-    Retrying --> Failed
-    Live --> PendingCancel
-    PartiallyMatched --> PendingCancel
-    Delayed --> PendingCancel
-    PendingCancel --> Canceled
-    Live --> PendingDeletion
-    PartiallyMatched --> PendingDeletion
-    PendingDeletion --> Canceled
-    Canceled --> Deleted
+    Submitting --> Failed
+    Live --> PartiallyFilled
+    PartiallyFilled --> Matched
+    Live --> Canceled
+    PartiallyFilled --> Canceled
+    Delayed --> Canceled
+    Live --> Expired
+    Delayed --> Expired
 ```
+
+## Trade Controller State Machine
+
+Recommended controller-owned `status.state` values:
+
+- `Matched`
+- `Mined`
+- `Retrying`
+- `Confirmed`
+- `Failed`
+
+### State Semantics
+
+- `Matched`
+  Trade matched and accepted for settlement, but no successful onchain execution observed yet.
+- `Mined`
+  Trade was observed onchain but has not reached finality.
+- `Retrying`
+  Trade execution failed transiently and Polymarket is retrying.
+- `Confirmed`
+  Terminal success. Settlement credit may be applied exactly once.
+- `Failed`
+  Terminal failure. No settlement credit should be applied.
 
 ## Allocation And Release Plan
 
@@ -430,7 +517,8 @@ Reserve quote currency:
 Where:
 
 - `max_notional = price * size`
-- exact decimal math only
+
+**exact decimal math only**
 
 ### Sell Orders
 
@@ -443,7 +531,7 @@ This uses the existing generic `Allocation.currency` string rather than inventin
 
 ### Settlement On Fill
 
-When an order fills, to any degree, the controller should create additional positive `core/v1/Allocation` records representing the asset actually received from that trade.
+When a Polymarket trade is observed, the controller should first materialize a `polymarket/v1/Trade` record and only create a positive settlement `core/v1/Allocation` once that trade reaches terminal successful state `Confirmed`.
 
 Recommended naming:
 
@@ -466,6 +554,7 @@ Amount semantics:
 - derive the amount from the exact Polymarket trade payload for that fill
 - do not recompute settlement from `float64 price * size`
 - use deterministic naming by `tradeID` so websocket replay and REST backfill remain idempotent
+- apply the settlement allocation only once the corresponding `polymarket/v1/Trade.status.state = Confirmed`
 
 Example BUY fill settlement:
 
@@ -492,7 +581,7 @@ Example SELL fill settlement:
 The original reservation allocation remains the hold for the unfilled remainder of the order.
 This means:
 
-- fills credit the received asset immediately
+- confirmed trades credit the received asset exactly once
 - remaining reserved balance stays locked in the original reservation allocation
 - cancellation / expiry later releases only the unfilled remainder
 
@@ -547,12 +636,16 @@ Watch `polymarket/v1/Order` records from Marketplane.
 React to:
 
 - create
-- updates that change `spec.desiredState`
-- updates that fix previously rejected specs
+- updates that change `spec.active` before first submit
 
 ### 2. Ensure Allocation
 
-For new orders:
+For draft orders where `spec.active = false`:
+
+- do not create allocation
+- do not submit to Polymarket
+
+For active orders that have not yet been submitted:
 
 - compute required allocation amount
 - create `core/v1/Allocation` if missing
@@ -602,25 +695,39 @@ Handle:
 - order placement events
 - order partial-fill updates
 - order cancellation events
-- trade settlement progression
+- trade settlement progression via upsert into `polymarket/v1/Trade`
 
-### 6. Apply Settlement Allocations
+### 6. Materialize Trade Records
 
 For each newly observed trade:
 
-- create a deterministic fill allocation named from the local order name plus Polymarket `tradeID`
-- for BUY fills, credit `polymarket-token/{assetId}`
-- for SELL fills, credit `USDC`
+- create or update a deterministic `polymarket/v1/Trade` record keyed by Polymarket `tradeID`
+- copy raw trade lifecycle into `Trade.status.external.*`
+- link it back to the local order by `spec.orderName` and labels
 - update order status with cumulative matched / remaining amounts
 
-### 7. Maintain Heartbeat
+### 7. Apply Settlement Allocations
+
+For each trade record that newly reaches `Confirmed`:
+
+- create a deterministic fill allocation named from the local order name plus Polymarket `tradeID`
+- mark `Trade.status.settlementApplied = true` once the allocation is created
+- for BUY fills, credit `polymarket-token/{assetId}`
+- for SELL fills, credit `USDC`
+
+For each trade record that reaches `Failed`:
+
+- do not create settlement credit
+- preserve the terminal failure on the trade record for debugging and reconciliation
+
+### 8. Maintain Heartbeat
 
 Polymarket documents a heartbeat mechanism for order safety.
 
 - while the controller owns live orders, it should keep the heartbeat alive on the documented interval
 - heartbeat loss should be treated as an at-risk condition because Polymarket may cancel open orders if liveness expires
 
-### 8. Periodic REST Sync
+### 9. Periodic REST Sync
 
 Three sync passes are recommended:
 
@@ -631,10 +738,10 @@ Three sync passes are recommended:
    - source of truth for currently open orders
    - restores `size_matched` and open-order presence after reconnects
 3. `GET /trades`
-   - backfill for fills that may have occurred while the controller was down
+   - backfill for trades that may have occurred while the controller was down
    - requires `maker_address` in the query, so the controller must know its canonical Polymarket maker address
    - required because `GET /data/orders` only returns open orders
-   - also restores any missing per-trade settlement allocations
+   - restores missing `polymarket/v1/Trade` records and any missing settlement allocations for confirmed trades
 
 This is important: using only `GET /data/orders` is not enough to recover full fills that completed while the controller was offline, because fully matched orders disappear from the open-orders list.
 
@@ -674,9 +781,8 @@ Expected controller config / env vars:
 - `POLY_API_PASSPHRASE`
 - `POLY_SIGNATURE_TYPE`
 - `POLY_FUNDER`
-- `POLY_OWNER`
 
-`POLY_OWNER` is the API-key owner UUID used in `POST /order`.
+`POST /order.owner` should be populated from `POLY_API_KEY`, matching the current `py-clob-client` SDK behavior.
 
 ## Failure Handling
 
@@ -685,7 +791,9 @@ Expected controller config / env vars:
 - Reconcile by local record key, not by event count.
 - Never submit a second remote order once `status.polymarketOrderID` exists, unless an explicit replace strategy is added later.
 - If a create request succeeds remotely but status update fails locally, targeted single-order sync must restore the missing remote order ID.
-- Each fill settlement allocation should be named deterministically from the local order name and external `tradeID`, so duplicate WS events and REST trade backfills collapse onto the same record.
+- Each `polymarket/v1/Trade` record should be named deterministically from external `tradeID`, so duplicate WS events and REST trade backfills collapse onto the same record.
+- Each fill settlement allocation should be named deterministically from the local order name and external `tradeID`, and should only be applied once for trades that reach `Confirmed`.
+- `spec.active` only affects whether the first submission should happen; it does not imply later cancellation or re-submission semantics.
 
 ### Retry Policy
 
@@ -694,6 +802,7 @@ Expected controller config / env vars:
 - REST 5xx retry with jitter.
 - 4xx validation failures become `Rejected`.
 - `503 cancel-only mode` should flip creates into a retryable blocked state but still allow cancels.
+- `active = false` draft records should remain inert during retry loops.
 
 ### Exact Arithmetic
 
@@ -708,14 +817,22 @@ Expected controller config / env vars:
 - signed order payload generation
 - L2 HMAC signing
 - state transitions from raw WS events
+- trade-record projection from raw WS and REST trade payloads
 - amount/allocation derivation for BUY and SELL
 - fill settlement allocation derivation for BUY and SELL
-- `desiredState` transition handling
+- settlement only on trade `Confirmed`
+- `active` gate handling before first submit
 
 ### Integration
 
+- create draft order with `active=false` and verify no allocation or remote submit occurs
+- flip `active=false -> true` before first submit and verify normal creation path
 - create order -> allocation approved -> remote order live
 - partial fill via WS + REST resync
+- trade record created from first observed `tradeID`
+- settlement not applied while trade is `MATCHED|MINED|RETRYING`
+- settlement applied once when trade becomes `CONFIRMED`
+- failed trade leaves no positive settlement allocation
 - partial BUY fill credits `polymarket-token/{assetId}`
 - partial SELL fill credits `USDC`
 - controller restart while order is still live
@@ -725,7 +842,7 @@ Expected controller config / env vars:
 - cancel single order
 - batch cancel during resync
 - delayed order lifecycle
-- delete workflow entering `PendingDeletion`
+- canceled or failed order may still retain `spec.active=true`
 
 ### Fixtures
 
@@ -751,6 +868,7 @@ Capture and freeze sample payloads for:
 
 - add `controllers/polymarket/` assets directory
 - add `MetaRecord` for `polymarket/v1/Order`
+- add `MetaRecord` for `polymarket/v1/Trade`
 - add schema fixtures and raw payload fixtures
 - add `cmd/polymarket-order-controller`
 
@@ -767,6 +885,7 @@ Capture and freeze sample payloads for:
 - create/wait on allocations
 - post orders
 - write local status
+- materialize derived trade records
 
 ### Phase 4: Sync + Recovery
 
@@ -775,11 +894,11 @@ Capture and freeze sample payloads for:
 - trade backfill
 - reconnect recovery
 - duplicate suppression
+- settlement replay from confirmed trade records
 
 ### Phase 5: Cleanup Semantics
 
-- cancel flow
-- pending deletion flow
+- external cancel / expiry cleanup flow
 - allocation release flow
 
 
