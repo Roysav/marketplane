@@ -126,6 +126,162 @@ func (*AppendLedgerResponse) Descriptor() ([]byte, []int) {
 	return file_ledger_proto_rawDescGZIP(), []int{1}
 }
 
+type ListLedgerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tradespace    string                 `protobuf:"bytes,1,opt,name=tradespace,proto3" json:"tradespace,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLedgerRequest) Reset() {
+	*x = ListLedgerRequest{}
+	mi := &file_ledger_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLedgerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLedgerRequest) ProtoMessage() {}
+
+func (x *ListLedgerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLedgerRequest.ProtoReflect.Descriptor instead.
+func (*ListLedgerRequest) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ListLedgerRequest) GetTradespace() string {
+	if x != nil {
+		return x.Tradespace
+	}
+	return ""
+}
+
+type ListLedgerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Entries       []*LedgerEntry         `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListLedgerResponse) Reset() {
+	*x = ListLedgerResponse{}
+	mi := &file_ledger_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListLedgerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListLedgerResponse) ProtoMessage() {}
+
+func (x *ListLedgerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListLedgerResponse.ProtoReflect.Descriptor instead.
+func (*ListLedgerResponse) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ListLedgerResponse) GetEntries() []*LedgerEntry {
+	if x != nil {
+		return x.Entries
+	}
+	return nil
+}
+
+type LedgerEntry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Amount        string                 `protobuf:"bytes,2,opt,name=amount,proto3" json:"amount,omitempty"`
+	Remaining     string                 `protobuf:"bytes,3,opt,name=remaining,proto3" json:"remaining,omitempty"`
+	Currency      string                 `protobuf:"bytes,4,opt,name=currency,proto3" json:"currency,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LedgerEntry) Reset() {
+	*x = LedgerEntry{}
+	mi := &file_ledger_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LedgerEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LedgerEntry) ProtoMessage() {}
+
+func (x *LedgerEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_ledger_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LedgerEntry.ProtoReflect.Descriptor instead.
+func (*LedgerEntry) Descriptor() ([]byte, []int) {
+	return file_ledger_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *LedgerEntry) GetKey() string {
+	if x != nil {
+		return x.Key
+	}
+	return ""
+}
+
+func (x *LedgerEntry) GetAmount() string {
+	if x != nil {
+		return x.Amount
+	}
+	return ""
+}
+
+func (x *LedgerEntry) GetRemaining() string {
+	if x != nil {
+		return x.Remaining
+	}
+	return ""
+}
+
+func (x *LedgerEntry) GetCurrency() string {
+	if x != nil {
+		return x.Currency
+	}
+	return ""
+}
+
 var File_ledger_proto protoreflect.FileDescriptor
 
 const file_ledger_proto_rawDesc = "" +
@@ -140,9 +296,21 @@ const file_ledger_proto_rawDesc = "" +
 	"tradespace\x12\x16\n" +
 	"\x06amount\x18\x03 \x01(\tR\x06amount\x12\x1a\n" +
 	"\bcurrency\x18\x04 \x01(\tR\bcurrency\"\x16\n" +
-	"\x14AppendLedgerResponse2]\n" +
+	"\x14AppendLedgerResponse\"3\n" +
+	"\x11ListLedgerRequest\x12\x1e\n" +
+	"\n" +
+	"tradespace\x18\x01 \x01(\tR\n" +
+	"tradespace\"K\n" +
+	"\x12ListLedgerResponse\x125\n" +
+	"\aentries\x18\x01 \x03(\v2\x1b.marketplane.v1.LedgerEntryR\aentries\"q\n" +
+	"\vLedgerEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x16\n" +
+	"\x06amount\x18\x02 \x01(\tR\x06amount\x12\x1c\n" +
+	"\tremaining\x18\x03 \x01(\tR\tremaining\x12\x1a\n" +
+	"\bcurrency\x18\x04 \x01(\tR\bcurrency2\xac\x01\n" +
 	"\rLedgerService\x12L\n" +
-	"\x06Append\x12\x1c.marketplane.v1.AppendLedger\x1a$.marketplane.v1.AppendLedgerResponseBDZBgithub.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1b\x06proto3"
+	"\x06Append\x12\x1c.marketplane.v1.AppendLedger\x1a$.marketplane.v1.AppendLedgerResponse\x12M\n" +
+	"\x04List\x12!.marketplane.v1.ListLedgerRequest\x1a\".marketplane.v1.ListLedgerResponseBDZBgithub.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1b\x06proto3"
 
 var (
 	file_ledger_proto_rawDescOnce sync.Once
@@ -156,19 +324,25 @@ func file_ledger_proto_rawDescGZIP() []byte {
 	return file_ledger_proto_rawDescData
 }
 
-var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_ledger_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_ledger_proto_goTypes = []any{
 	(*AppendLedger)(nil),         // 0: marketplane.v1.AppendLedger
 	(*AppendLedgerResponse)(nil), // 1: marketplane.v1.AppendLedgerResponse
+	(*ListLedgerRequest)(nil),    // 2: marketplane.v1.ListLedgerRequest
+	(*ListLedgerResponse)(nil),   // 3: marketplane.v1.ListLedgerResponse
+	(*LedgerEntry)(nil),          // 4: marketplane.v1.LedgerEntry
 }
 var file_ledger_proto_depIdxs = []int32{
-	0, // 0: marketplane.v1.LedgerService.Append:input_type -> marketplane.v1.AppendLedger
-	1, // 1: marketplane.v1.LedgerService.Append:output_type -> marketplane.v1.AppendLedgerResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: marketplane.v1.ListLedgerResponse.entries:type_name -> marketplane.v1.LedgerEntry
+	0, // 1: marketplane.v1.LedgerService.Append:input_type -> marketplane.v1.AppendLedger
+	2, // 2: marketplane.v1.LedgerService.List:input_type -> marketplane.v1.ListLedgerRequest
+	1, // 3: marketplane.v1.LedgerService.Append:output_type -> marketplane.v1.AppendLedgerResponse
+	3, // 4: marketplane.v1.LedgerService.List:output_type -> marketplane.v1.ListLedgerResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_ledger_proto_init() }
@@ -182,7 +356,7 @@ func file_ledger_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_ledger_proto_rawDesc), len(file_ledger_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -23,6 +23,7 @@ func NewLedgerStorage(pool *pgxpool.Pool) *LedgerStorage {
 
 func (s *LedgerStorage) Append(ctx context.Context, prefix, key, amount, currency string) error {
 	lockKey := fmt.Sprintf("ledger:%s:%s", prefix, currency)
+	likePrefix := prefix + "%"
 
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -40,7 +41,7 @@ func (s *LedgerStorage) Append(ctx context.Context, prefix, key, amount, currenc
 	var currentBalance string
 	err = tx.QueryRow(ctx,
 		`SELECT COALESCE(SUM(amount), 0)::TEXT FROM ledger WHERE key LIKE $1 AND currency = $2`,
-		prefix, currency,
+		likePrefix, currency,
 	).Scan(&currentBalance)
 	if err != nil {
 		return fmt.Errorf("ledger: sum balance: %w", err)

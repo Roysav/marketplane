@@ -101,6 +101,33 @@ func SVC(ctx context.Context, t *testing.T) *service.RecordService {
 	})
 }
 
+// LedgerSVC creates a LedgerService and its backing RecordService on a fresh
+// temporary database. Skips the test if postgres is not available.
+func LedgerSVC(ctx context.Context, t *testing.T) (*service.LedgerService, *service.RecordService) {
+	t.Helper()
+
+	pool := Pool(ctx, t)
+	rows := postgres.New(pool)
+
+	validator, err := record.NewValidator()
+	if err != nil {
+		t.Fatalf("failed to create validator: %v", err)
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
+
+	recordSvc := service.New(service.Config{
+		Rows:      rows,
+		Validator: validator,
+		Logger:    logger,
+	})
+
+	ledgerStorage := postgres.NewLedgerStorage(pool)
+	ledgerSvc := service.NewLedgerService(ledgerStorage, *recordSvc, logger)
+
+	return ledgerSvc, recordSvc
+}
+
 // sanitize turns a test name into a safe database name.
 func sanitize(name string) string {
 	r := strings.NewReplacer("/", "_", " ", "_", "-", "_")

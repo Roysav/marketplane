@@ -40,3 +40,7 @@ func (lsvc *LedgerService) Append(ctx context.Context, allocationName, tradespac
 	prefix := record.Key("core/v1/Allocation", tradespace, "")
 	return lsvc.storage.Append(ctx, prefix, key, amount, currency)
 }
+
+func (lsvc *LedgerService) List(ctx context.Context, tradespace string) ([]*storage.LedgerEntry, error) {
+	return lsvc.storage.List(ctx, tradespace)
+}

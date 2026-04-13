@@ -10,6 +10,7 @@ import "google/protobuf/struct.proto";
 
 service LedgerService {
   rpc Append(AppendLedger) returns (AppendLedgerResponse);
+  rpc List(ListLedgerRequest) returns (ListLedgerResponse);
 }
 
 
@@ -20,7 +21,20 @@ message AppendLedger {
   string currency   = 4;
 }
 
-message AppendLedgerResponse {
+message AppendLedgerResponse {}
 
+message ListLedgerRequest {
+  string tradespace = 1;
+}
+
+message ListLedgerResponse {
+  repeated LedgerEntry entries = 1;
+}
+
+message LedgerEntry {
+  string key       = 1;
+  string amount    = 2;
+  string remaining = 3;
+  string currency  = 4;
 }
 

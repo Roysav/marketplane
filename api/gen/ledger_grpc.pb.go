@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	LedgerService_Append_FullMethodName = "/marketplane.v1.LedgerService/Append"
+	LedgerService_List_FullMethodName   = "/marketplane.v1.LedgerService/List"
 )
 
 // LedgerServiceClient is the client API for LedgerService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LedgerServiceClient interface {
 	Append(ctx context.Context, in *AppendLedger, opts ...grpc.CallOption) (*AppendLedgerResponse, error)
+	List(ctx context.Context, in *ListLedgerRequest, opts ...grpc.CallOption) (*ListLedgerResponse, error)
 }
 
 type ledgerServiceClient struct {
@@ -47,11 +49,22 @@ func (c *ledgerServiceClient) Append(ctx context.Context, in *AppendLedger, opts
 	return out, nil
 }
 
+func (c *ledgerServiceClient) List(ctx context.Context, in *ListLedgerRequest, opts ...grpc.CallOption) (*ListLedgerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListLedgerResponse)
+	err := c.cc.Invoke(ctx, LedgerService_List_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LedgerServiceServer is the server API for LedgerService service.
 // All implementations must embed UnimplementedLedgerServiceServer
 // for forward compatibility.
 type LedgerServiceServer interface {
 	Append(context.Context, *AppendLedger) (*AppendLedgerResponse, error)
+	List(context.Context, *ListLedgerRequest) (*ListLedgerResponse, error)
 	mustEmbedUnimplementedLedgerServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedLedgerServiceServer struct{}
 
 func (UnimplementedLedgerServiceServer) Append(context.Context, *AppendLedger) (*AppendLedgerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Append not implemented")
+}
+func (UnimplementedLedgerServiceServer) List(context.Context, *ListLedgerRequest) (*ListLedgerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedLedgerServiceServer) mustEmbedUnimplementedLedgerServiceServer() {}
 func (UnimplementedLedgerServiceServer) testEmbeddedByValue()                       {}
@@ -104,6 +120,24 @@ func _LedgerService_Append_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LedgerService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListLedgerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LedgerServiceServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LedgerService_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LedgerServiceServer).List(ctx, req.(*ListLedgerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LedgerService_ServiceDesc is the grpc.ServiceDesc for LedgerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var LedgerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Append",
 			Handler:    _LedgerService_Append_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _LedgerService_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -18,7 +18,26 @@ type LedgerServer struct {
 }
 
 func (s *LedgerServer) Append(ctx context.Context, in *pb.AppendLedger) (*pb.AppendLedgerResponse, error) {
-	return &pb.AppendLedgerResponse{}, ledgerToStreamGRPCError(s.svc.Append(ctx, in.Allocation, in.Tradespace, in.Amount, in.Currency))
+	return &pb.AppendLedgerResponse{}, ledgerToGRPCError(s.svc.Append(ctx, in.Allocation, in.Tradespace, in.Amount, in.Currency))
+}
+
+func (s *LedgerServer) List(ctx context.Context, in *pb.ListLedgerRequest) (*pb.ListLedgerResponse, error) {
+	entries, err := s.svc.List(ctx, in.Tradespace)
+	if err != nil {
+		return nil, ledgerToGRPCError(err)
+	}
+
+	pbEntries := make([]*pb.LedgerEntry, len(entries))
+	for i, e := range entries {
+		pbEntries[i] = &pb.LedgerEntry{
+			Key:       e.Key,
+			Amount:    e.Amount,
+			Remaining: e.Remaining,
+			Currency:  e.Currency,
+		}
+	}
+
+	return &pb.ListLedgerResponse{Entries: pbEntries}, nil
 }
 
 // NewLedgerServer creates a new gRPC server.
@@ -33,7 +52,7 @@ func (s *LedgerServer) Register(grpcServer *grpc.Server) {
 	pb.RegisterLedgerServiceServer(grpcServer, s)
 }
 
-func ledgerToStreamGRPCError(err error) error {
+func ledgerToGRPCError(err error) error {
 	if err == nil {
 		return nil
 	}

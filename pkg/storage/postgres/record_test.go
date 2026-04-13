@@ -26,17 +26,6 @@ func newTestStorage(t *testing.T) *Storage {
 		t.Skipf("postgres not available: %v", err)
 	}
 
-	_, err = s.pool.Exec(ctx, `
-		CREATE TABLE IF NOT EXISTS records (
-			key    TEXT PRIMARY KEY,
-			data   JSONB NOT NULL,
-			labels VARCHAR(255)[] NOT NULL DEFAULT '{}'
-		)
-	`)
-	if err != nil {
-		t.Fatalf("create table: %v", err)
-	}
-
 	_, err = s.pool.Exec(ctx, `TRUNCATE TABLE records`)
 	if err != nil {
 		t.Fatalf("truncate: %v", err)
@@ -117,7 +106,7 @@ func TestStorage_Update(t *testing.T) {
 	}
 
 	row.Data = []byte(`{"v": 2}`)
-	updated, err := s.Update(ctx, row)
+	updated, err := s.Update(ctx, row, []byte(""))
 	if err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -135,7 +124,7 @@ func TestStorage_UpdateNotFound(t *testing.T) {
 	s := newTestStorage(t)
 	ctx := context.Background()
 
-	_, err := s.Update(ctx, &storage.Row{Key: "missing/key", Data: []byte(`{}`)})
+	_, err := s.Update(ctx, &storage.Row{Key: "missing/key", Data: []byte(`{}`)}, []byte(""))
 	if !isError(err, storage.ErrNotFound) {
 		t.Errorf("want ErrNotFound, got: %v", err)
 	}

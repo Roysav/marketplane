@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -88,8 +89,9 @@ func TestService_Update(t *testing.T) {
 	}
 
 	// Update
+	lastApplied, _ := json.Marshal(created)
 	created.Spec["description"] = "updated"
-	updated, err := svc.Update(ctx, created)
+	updated, err := svc.Update(ctx, created, lastApplied)
 	if err != nil {
 		t.Fatalf("Update failed: %v", err)
 	}
