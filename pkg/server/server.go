@@ -20,12 +20,12 @@ import (
 // Server implements the gRPC RecordService.
 type Server struct {
 	pb.UnimplementedRecordServiceServer
-	svc    *service.Service
+	svc    *service.RecordService
 	logger *slog.Logger
 }
 
 // New creates a new gRPC server.
-func New(svc *service.Service, logger *slog.Logger) *Server {
+func New(svc *service.RecordService, logger *slog.Logger) *Server {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -78,11 +78,13 @@ func (s *Server) Get(ctx context.Context, req *GetRequest) (*GetResponse, error)
 // Update updates an existing record.
 func (s *Server) Update(ctx context.Context, req *UpdateRequest) (*UpdateResponse, error) {
 	r, err := pbToRecord(req.Record)
+
+	lastApplied, err := req.LastApplied.MarshalJSON()
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid record: %v", err)
 	}
 
-	updated, err := s.svc.Update(ctx, r)
+	updated, err := s.svc.Update(ctx, r, lastApplied)
 	if err != nil {
 		return nil, toGRPCError(err)
 	}

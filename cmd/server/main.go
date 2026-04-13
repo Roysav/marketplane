@@ -93,6 +93,9 @@ func main() {
 		Logger:  logger,
 	})
 
+	ledgerStorage := postgres.NewLedgerStorage(pool)
+	ledgerSvc := service.NewLedgerService(ledgerStorage, *svc, logger)
+
 	// Initialize gRPC server
 	grpcServer := grpc.NewServer()
 	srv := server.New(svc, logger)
@@ -100,6 +103,9 @@ func main() {
 
 	streamSrv := server.NewStreamServer(streamSvc, logger)
 	streamSrv.Register(grpcServer)
+
+	ledgerSrv := server.NewLedgerServer(ledgerSvc, logger)
+	ledgerSrv.Register(grpcServer)
 
 	// Enable reflection for grpcurl/grpcui
 	reflection.Register(grpcServer)

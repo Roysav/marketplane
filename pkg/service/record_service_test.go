@@ -12,7 +12,7 @@ import (
 	"github.com/roysav/marketplane/tests"
 )
 
-func newTestService(t *testing.T) *service.Service {
+func newTestService(t *testing.T) *service.RecordService {
 	t.Helper()
 	ctx := context.Background()
 	return tests.SVC(ctx, t)

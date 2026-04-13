@@ -28,7 +28,7 @@ type Query struct {
 type RowStorage interface {
 	Create(ctx context.Context, r *Row) (*Row, error)
 	Get(ctx context.Context, key string) (*Row, error)
-	Update(ctx context.Context, r *Row) (*Row, error)
+	Update(ctx context.Context, r *Row, lastApplied []byte) (*Row, error)
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, q Query) ([]*Row, error)
 	Close() error

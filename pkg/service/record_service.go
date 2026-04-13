@@ -20,7 +20,8 @@ var (
 	ErrInvalidScope  = errors.New("invalid scope")
 )
 
-// Config holds configuration for the Service.
+// Config holds configuration for the RecordService.
+// TODO: Remove the config thing. Just pass it directly to constructor of the RecordService, remove the default slog, we already pass one from main.go.
 type Config struct {
 	Rows      storage.RowStorage
 	Events    storage.EventStorage
@@ -28,22 +29,23 @@ type Config struct {
 	Logger    *slog.Logger // optional, defaults to slog.Default()
 }
 
-// Service provides operations on records.
-type Service struct {
+// RecordService provides operations on records.
+// TODO: Use either a ptr for rows, events, validator. or regular ahhh forgot.
+type RecordService struct {
 	rows      storage.RowStorage
 	events    storage.EventStorage
 	validator *record.Validator
 	logger    *slog.Logger
 }
 
-// New creates a new Service.
-func New(cfg Config) *Service {
+// New creates a new RecordService.
+func New(cfg Config) *RecordService {
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
 
-	return &Service{
+	return &RecordService{
 		rows:      cfg.Rows,
 		events:    cfg.Events,
 		validator: cfg.Validator,
@@ -52,7 +54,7 @@ func New(cfg Config) *Service {
 }
 
 // Create creates a new record.
-func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
+func (s *RecordService) Create(ctx context.Context, r *record.Record) (*record.Record, error) {
 
 	// Validate the record spec against schema
 	if err := s.validator.Validate(r); err != nil {
@@ -81,7 +83,7 @@ func (s *Service) Create(ctx context.Context, r *record.Record) (*record.Record,
 }
 
 // Get retrieves a record by key.
-func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*record.Record, error) {
+func (s *RecordService) Get(ctx context.Context, typeStr, tradespace, name string) (*record.Record, error) {
 	row, err := s.rows.Get(ctx, record.Key(typeStr, tradespace, name))
 	if err != nil {
 		if isNotFound(err) {
@@ -94,7 +96,7 @@ func (s *Service) Get(ctx context.Context, typeStr, tradespace, name string) (*r
 }
 
 // Update updates an existing record.
-func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record, error) {
+func (s *RecordService) Update(ctx context.Context, r *record.Record, lastApplied []byte) (*record.Record, error) {
 	if err := s.validator.Validate(r); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrValidation, err)
 	}
@@ -104,7 +106,7 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 		return nil, err
 	}
 
-	row, err = s.rows.Update(ctx, row)
+	row, err = s.rows.Update(ctx, row, lastApplied)
 	if err != nil {
 		if isNotFound(err) {
 			return nil, fmt.Errorf("%w: %s/%s", ErrNotFound, r.ObjectMeta.Tradespace, r.ObjectMeta.Name)
@@ -119,7 +121,7 @@ func (s *Service) Update(ctx context.Context, r *record.Record) (*record.Record,
 }
 
 // Delete removes a record.
-func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) error {
+func (s *RecordService) Delete(ctx context.Context, typeStr, tradespace, name string) error {
 	err := s.rows.Delete(ctx, record.Key(typeStr, tradespace, name))
 	if err != nil {
 		if isNotFound(err) {
@@ -138,7 +140,7 @@ func (s *Service) Delete(ctx context.Context, typeStr, tradespace, name string) 
 }
 
 // List returns records matching the query.
-func (s *Service) List(ctx context.Context, typeStr string, tradespace string, labels map[string]string) ([]*record.Record, error) {
+func (s *RecordService) List(ctx context.Context, typeStr string, tradespace string, labels map[string]string) ([]*record.Record, error) {
 	rows, err := s.rows.List(ctx, storage.Query{
 		Prefix: record.Key(typeStr, tradespace, ""),
 		Labels: labels,
@@ -166,7 +168,7 @@ func (s *Service) List(ctx context.Context, typeStr string, tradespace string, l
 }
 
 // Watch returns a channel of events for records of the given type.
-func (s *Service) Watch(ctx context.Context, typeStr string) (<-chan storage.Event, error) {
+func (s *RecordService) Watch(ctx context.Context, typeStr string) (<-chan storage.Event, error) {
 	if s.events == nil {
 		return nil, errors.New("event storage not configured")
 	}
@@ -174,7 +176,7 @@ func (s *Service) Watch(ctx context.Context, typeStr string) (<-chan storage.Eve
 	return s.events.Subscribe(ctx, topic)
 }
 
-func (s *Service) publishEvent(ctx context.Context, action string, r *record.Record) {
+func (s *RecordService) publishEvent(ctx context.Context, action string, r *record.Record) {
 	if s.events == nil {
 		return
 	}

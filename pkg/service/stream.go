@@ -38,6 +38,8 @@ type StreamDefinitionSpec struct {
 }
 
 // StreamService provides operations on streams defined by StreamDefinitions.
+
+// StreamService TODO: Use record service instead of directly accessing the storage, remove the default logger.
 type StreamService struct {
 	rows    storage.RowStorage
 	streams storage.StreamStorage

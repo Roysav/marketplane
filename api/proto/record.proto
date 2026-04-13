@@ -67,6 +67,7 @@ message GetResponse {
 // UpdateRequest is the request for Update.
 message UpdateRequest {
   Record record = 1;
+  google.protobuf.Struct last_applied = 2;
 }
 
 // UpdateResponse is the response for Update.

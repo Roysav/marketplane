@@ -54,7 +54,7 @@ func (s *Storage) Get(ctx context.Context, key string) (*storage.Row, error) {
 	return row, nil
 }
 
-func (s *Storage) Update(ctx context.Context, r *storage.Row) (*storage.Row, error) {
+func (s *Storage) Update(ctx context.Context, r *storage.Row, lastApplied []byte) (*storage.Row, error) {
 	tag, err := s.pool.Exec(ctx,
 		`UPDATE records SET data = $2, labels = $3 WHERE key = $1`,
 		r.Key, r.Data, labelsToArray(r.Labels),

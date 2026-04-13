@@ -352,6 +352,7 @@ func (x *GetResponse) GetRecord() *Record {
 type UpdateRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Record        *Record                `protobuf:"bytes,1,opt,name=record,proto3" json:"record,omitempty"`
+	LastApplied   *structpb.Struct       `protobuf:"bytes,2,opt,name=last_applied,json=lastApplied,proto3" json:"last_applied,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -389,6 +390,13 @@ func (*UpdateRequest) Descriptor() ([]byte, []int) {
 func (x *UpdateRequest) GetRecord() *Record {
 	if x != nil {
 		return x.Record
+	}
+	return nil
+}
+
+func (x *UpdateRequest) GetLastApplied() *structpb.Struct {
+	if x != nil {
+		return x.LastApplied
 	}
 	return nil
 }
@@ -773,9 +781,10 @@ const file_record_proto_rawDesc = "" +
 	"tradespace\x12\x12\n" +
 	"\x04name\x18\x03 \x01(\tR\x04name\"=\n" +
 	"\vGetResponse\x12.\n" +
-	"\x06record\x18\x01 \x01(\v2\x16.marketplane.v1.RecordR\x06record\"?\n" +
+	"\x06record\x18\x01 \x01(\v2\x16.marketplane.v1.RecordR\x06record\"{\n" +
 	"\rUpdateRequest\x12.\n" +
-	"\x06record\x18\x01 \x01(\v2\x16.marketplane.v1.RecordR\x06record\"@\n" +
+	"\x06record\x18\x01 \x01(\v2\x16.marketplane.v1.RecordR\x06record\x12:\n" +
+	"\flast_applied\x18\x02 \x01(\v2\x17.google.protobuf.StructR\vlastApplied\"@\n" +
 	"\x0eUpdateResponse\x12.\n" +
 	"\x06record\x18\x01 \x01(\v2\x16.marketplane.v1.RecordR\x06record\"W\n" +
 	"\rDeleteRequest\x12\x12\n" +
@@ -851,27 +860,28 @@ var file_record_proto_depIdxs = []int32{
 	1,  // 5: marketplane.v1.CreateResponse.record:type_name -> marketplane.v1.Record
 	1,  // 6: marketplane.v1.GetResponse.record:type_name -> marketplane.v1.Record
 	1,  // 7: marketplane.v1.UpdateRequest.record:type_name -> marketplane.v1.Record
-	1,  // 8: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
-	15, // 9: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
-	1,  // 10: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
-	1,  // 11: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
-	2,  // 12: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
-	4,  // 13: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
-	6,  // 14: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
-	8,  // 15: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
-	10, // 16: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
-	12, // 17: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
-	3,  // 18: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
-	5,  // 19: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
-	7,  // 20: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
-	9,  // 21: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
-	11, // 22: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
-	13, // 23: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
-	18, // [18:24] is the sub-list for method output_type
-	12, // [12:18] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	16, // 8: marketplane.v1.UpdateRequest.last_applied:type_name -> google.protobuf.Struct
+	1,  // 9: marketplane.v1.UpdateResponse.record:type_name -> marketplane.v1.Record
+	15, // 10: marketplane.v1.ListRequest.labels:type_name -> marketplane.v1.ListRequest.LabelsEntry
+	1,  // 11: marketplane.v1.ListResponse.records:type_name -> marketplane.v1.Record
+	1,  // 12: marketplane.v1.WatchEvent.record:type_name -> marketplane.v1.Record
+	2,  // 13: marketplane.v1.RecordService.Create:input_type -> marketplane.v1.CreateRequest
+	4,  // 14: marketplane.v1.RecordService.Get:input_type -> marketplane.v1.GetRequest
+	6,  // 15: marketplane.v1.RecordService.Update:input_type -> marketplane.v1.UpdateRequest
+	8,  // 16: marketplane.v1.RecordService.Delete:input_type -> marketplane.v1.DeleteRequest
+	10, // 17: marketplane.v1.RecordService.List:input_type -> marketplane.v1.ListRequest
+	12, // 18: marketplane.v1.RecordService.Watch:input_type -> marketplane.v1.WatchRequest
+	3,  // 19: marketplane.v1.RecordService.Create:output_type -> marketplane.v1.CreateResponse
+	5,  // 20: marketplane.v1.RecordService.Get:output_type -> marketplane.v1.GetResponse
+	7,  // 21: marketplane.v1.RecordService.Update:output_type -> marketplane.v1.UpdateResponse
+	9,  // 22: marketplane.v1.RecordService.Delete:output_type -> marketplane.v1.DeleteResponse
+	11, // 23: marketplane.v1.RecordService.List:output_type -> marketplane.v1.ListResponse
+	13, // 24: marketplane.v1.RecordService.Watch:output_type -> marketplane.v1.WatchEvent
+	19, // [19:25] is the sub-list for method output_type
+	13, // [13:19] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_record_proto_init() }

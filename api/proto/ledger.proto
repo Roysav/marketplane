@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package marketplane.v1;
+
+option go_package = "github.com/roysav/marketplane/api/gen/marketplane/v1;marketplanev1";
+
+import "google/protobuf/struct.proto";
+
+
+
+service LedgerService {
+  rpc Append(AppendLedger) returns (AppendLedgerResponse);
+}
+
+
+message AppendLedger {
+  string allocation = 1;
+  string tradespace = 2;
+  string amount     = 3;
+  string currency   = 4;
+}
+
+message AppendLedgerResponse {
+
+}
+

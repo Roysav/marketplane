@@ -79,9 +79,9 @@ func Pool(ctx context.Context, t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// SVC creates a Service backed by a fresh temporary database.
+// SVC creates a RecordService backed by a fresh temporary database.
 // Skips the test if postgres is not available.
-func SVC(ctx context.Context, t *testing.T) *service.Service {
+func SVC(ctx context.Context, t *testing.T) *service.RecordService {
 	t.Helper()
 
 	pool := Pool(ctx, t)
