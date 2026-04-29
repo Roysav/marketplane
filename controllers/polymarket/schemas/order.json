@@ -1,0 +1,38 @@
+{
+  "group": "polymarket",
+  "version": "v1",
+  "kind": "Order",
+  "schema": {
+    "type": "object",
+    "required": ["assetId", "side", "price", "size", "orderType", "active"],
+    "additionalProperties": false,
+    "properties": {
+      "assetId": {
+        "type": "string",
+        "minLength": 1
+      },
+      "side": {
+        "type": "string",
+        "enum": ["BUY", "SELL"]
+      },
+      "price": {
+        "type": "string",
+        "minLength": 1
+      },
+      "size": {
+        "type": "string",
+        "minLength": 1
+      },
+      "orderType": {
+        "type": "string",
+        "enum": ["GTC", "GTD", "FOK", "FAK"]
+      },
+      "active": {
+        "type": "boolean"
+      },
+      "expiration": {
+        "type": ["integer", "null"]
+      }
+    }
+  }
+}

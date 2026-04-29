@@ -11,6 +11,29 @@ This plan assumes we follow the existing repo shape:
 - binaries in `cmd/*`
 - controller-specific schemas and fixtures in `controllers/polymarket/*`
 
+## AI Agent Instruction
+
+Implementation should prefer the community SDK
+`github.com/GoPolymarket/polymarket-go-sdk`
+instead of hand-rolling Polymarket auth, signing, REST, or WebSocket clients.
+
+Use the SDK as the default integration strategy:
+
+- use `pkg/auth` for signer creation and auth config
+- use `pkg/clob` for REST order/account/market endpoints
+- use `pkg/clob/ws` for user-channel WebSocket handling
+- use the SDK order builder for signed order construction
+- use the SDK retry / reconnect / heartbeat behavior where it already exists
+
+AI agents working from this doc should:
+
+- add the SDK dependency first
+- keep Marketplane-specific reconciliation, allocations, schema loading, and status projection in this repo
+- add only a thin Marketplane adapter around the SDK where needed for config translation, test seams, and error normalization
+- avoid creating new `pkg/polymarket/auth.go`, `signing.go`, or `ws.go` files unless there is a proven SDK gap
+
+The SDK is community-maintained rather than official, so the agent should still pin a specific version, read its README/examples, and add focused tests around the adapter boundary.
+
 ## Authentication NOTE
 
 Polymarket order creation cannot be done with API credentials alone.
@@ -150,7 +173,9 @@ These trade statuses should live on derived `polymarket/v1/Trade` records instea
 
 ### Market Metadata Needed For Signing
 
-Without an SDK, the controller must fetch or derive:
+If the SDK is used, prefer its order-builder and metadata APIs instead of re-implementing the fetch/signing flow manually.
+
+The controller still needs access to:
 
 - fee rate for the token
 - tick size
@@ -158,6 +183,7 @@ Without an SDK, the controller must fetch or derive:
 - token and condition identifiers
 
 This metadata is required to build the exact signed payload and to avoid avoidable rejection errors.
+The SDK should be treated as the primary mechanism for obtaining or applying it.
 
 ## Current Marketplane Constraints
 
@@ -223,12 +249,15 @@ This keeps trade-settlement lifecycle separate from order lifecycle and gives re
 
 - `pkg/controller/polymarket_order.go`
 - `pkg/controller/polymarket_order_test.go`
-- `pkg/polymarket/client.go`
-- `pkg/polymarket/auth.go`
-- `pkg/polymarket/signing.go`
-- `pkg/polymarket/ws.go`
+- `pkg/polymarket/sdk.go`
+- `pkg/polymarket/sdk_test.go`
 - `pkg/polymarket/types.go`
 - `cmd/polymarket-order-controller/main.go`
+
+Notes:
+
+- `pkg/polymarket/sdk.go` should be a thin adapter over `github.com/GoPolymarket/polymarket-go-sdk`
+- do not maintain a parallel in-house Polymarket protocol implementation unless the SDK is missing a required feature
 
 ## Proposed `polymarket/v1/Order` Record
 
@@ -750,21 +779,35 @@ If that assumption proves false in practice, the controller needs an explicit fa
 
 ## Polymarket Client Package Plan
 
-Create a small internal Go client instead of depending on an SDK:
+Use `github.com/GoPolymarket/polymarket-go-sdk` as the default client implementation.
 
-- `pkg/polymarket/auth.go`
-  - L1 EIP-712 auth helpers
-  - L2 HMAC request signing
-- `pkg/polymarket/signing.go`
-  - exact signed order construction
-  - maker/taker amount math
-  - nonce / salt handling
-- `pkg/polymarket/client.go`
-  - REST endpoints
-- `pkg/polymarket/ws.go`
-  - user channel connect / reconnect / resubscribe
-- `pkg/polymarket/types.go`
-  - raw REST and WS payload structs
+Recommended approach:
+
+- add the SDK dependency with a pinned version
+- create a thin adapter in `pkg/polymarket/sdk.go`
+- keep Marketplane-owned types/status mapping in our code, but delegate Polymarket protocol work to the SDK
+
+The adapter should use the SDK along these lines:
+
+- initialize signer with `auth.NewPrivateKeySigner(...)`
+- initialize the SDK client with `polymarket.NewClientE(...)`
+- attach credentials via `client.WithAuth(signer, creds)`
+- place orders with `client.CLOB.CreateOrder(...)`
+- build signed orders with `clob.NewOrderBuilder(...)`
+- use `client.CLOB.WS()` for authenticated order/trade streams
+- use `Orders` / `OrdersAll` / `Trades` / market/account helpers for REST sync and recovery
+- use SDK defaults such as `WithSignatureType`, `WithAuthNonce`, `WithFunder`, and `WithSaltGenerator` instead of re-creating those knobs locally
+
+Do not hand-roll:
+
+- L1 EIP-712 signing
+- L2 HMAC signing
+- user-channel WebSocket reconnect / heartbeat logic
+- raw order builder hashing and signature formatting
+
+Only add custom protocol code if the SDK is missing a specific endpoint or behavior required by the controller.
+
+If builder attribution is needed later, use the SDK's builder config / remote-signer support instead of overloading the trading API credentials.
 
 ### Config Inputs
 
@@ -783,6 +826,9 @@ Expected controller config / env vars:
 - `POLY_FUNDER`
 
 `POST /order.owner` should be populated from `POLY_API_KEY`, matching the current `py-clob-client` SDK behavior.
+
+If the SDK prefers different constructor names or config objects, the Marketplane adapter may translate from these env vars into SDK-native config.
+Keep the env surface stable for Marketplane unless there is a strong reason to change it.
 
 ## Failure Handling
 
@@ -814,8 +860,8 @@ Expected controller config / env vars:
 
 ### Unit
 
-- signed order payload generation
-- L2 HMAC signing
+- SDK adapter configuration / translation
+- SDK order-builder usage for signed order creation
 - state transitions from raw WS events
 - trade-record projection from raw WS and REST trade payloads
 - amount/allocation derivation for BUY and SELL
@@ -874,10 +920,11 @@ Capture and freeze sample payloads for:
 
 ### Phase 2: Polymarket Client
 
-- implement REST auth
-- implement order signing
-- implement raw REST endpoints
-- implement WS user client
+- add `github.com/GoPolymarket/polymarket-go-sdk`
+- implement the thin Marketplane adapter over the SDK
+- wire signer / credentials / signature type / funder into the SDK
+- use SDK order builder and CLOB methods instead of custom signing code
+- use SDK WebSocket client instead of custom WS protocol code
 
 ### Phase 3: Controller Core
 
@@ -904,6 +951,7 @@ Capture and freeze sample payloads for:
 
 ## References
 
+- [GoPolymarket SDK](https://github.com/GoPolymarket/polymarket-go-sdk)
 - [Authentication](https://docs.polymarket.com/api-reference/authentication)
 - [User Channel](https://docs.polymarket.com/market-data/websocket/user-channel)
 - [Post a new order](https://docs.polymarket.com/api-reference/trade/post-a-new-order)

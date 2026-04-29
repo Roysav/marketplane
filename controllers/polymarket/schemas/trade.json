@@ -1,0 +1,30 @@
+{
+  "group": "polymarket",
+  "version": "v1",
+  "kind": "Trade",
+  "schema": {
+    "type": "object",
+    "required": [
+      "orderName",
+      "polymarketOrderID",
+      "tradeID",
+      "market",
+      "assetId",
+      "side",
+      "price",
+      "size"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "orderName": { "type": "string", "minLength": 1 },
+      "polymarketOrderID": { "type": "string", "minLength": 1 },
+      "tradeID": { "type": "string", "minLength": 1 },
+      "market": { "type": "string", "minLength": 1 },
+      "assetId": { "type": "string", "minLength": 1 },
+      "side": { "type": "string", "enum": ["BUY", "SELL"] },
+      "price": { "type": "string", "minLength": 1 },
+      "size": { "type": "string", "minLength": 1 },
+      "makerAddress": { "type": "string" }
+    }
+  }
+}

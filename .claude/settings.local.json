@@ -3,7 +3,12 @@
     "allow": [
       "Bash(go test:*)",
       "Bash(go mod tidy:*)",
-      "WebFetch(domain:docs.polymarket.com)"
+      "WebFetch(domain:docs.polymarket.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//c/Users/roysa/go/pkg/mod/github.com/!go!polymarket/polymarket-go-sdk@v1.1.2/pkg/clob/ws//**)",
+      "Bash(go doc *)",
+      "Bash(git -C \"C:/Users/roysa/GolandProjects/polymarket-go-sdk\" status)",
+      "Bash(git -C \"C:/Users/roysa/GolandProjects/polymarket-go-sdk\" branch --show-current)"
     ]
   }
 }

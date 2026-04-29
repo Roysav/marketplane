@@ -159,6 +159,15 @@ type RowStorage interface {
 - [x] PostgreSQL
 - [ ] Intensive Validation
 
+## Coding Rules
+
+- **Never hide errors.** Don't discard errors with `_`, don't swallow them with default values, don't catch-and-continue. If a call can fail, propagate the error up until you hit a boundary that can genuinely handle it (log + return, fail the request, retry). Parsing, decoding, I/O, and type assertions that can fail must return the failure, not fall through to a zero value. A zero time.Time or "" silently replacing a parse error is a bug — surface it.
+- **Don't guess wire formats.** If a field's format isn't documented or directly observable in code you've read, don't invent fallback heuristics ("try format A, fall back to format B"). Pick one format, fail loud if it doesn't match, and the next engineer will fix the mapping once they see a real payload.
+- **Verify before mapping — check every field.** Before writing any (un)marshaling, parsing, or type-conversion code, look up the actual type/format. Run `go doc <pkg>.<Type>`, read the SDK source, or inspect a real sample payload. Do this for *every* field, not just the obviously-tricky ones. In particular: don't assume a missing value is `""` — many APIs (Polymarket included) use `"0"` for absent integer-valued strings, and a `if x != ""` guard will silently let `"0"` through and map epoch-zero into your domain. Also don't assume RFC3339 when a field is a unix-seconds string. The 30 seconds spent on `go doc` is cheaper than a parse failure that takes down `ListOpenOrders` for every caller.
+- **Don't over-abstract.** No helper packages, option structs, or interfaces for single-caller code paths. Three similar lines beats a premature abstraction.
+- **No backwards-compat shims unless asked.** Delete unused code; don't rename to `_unused` or leave `// removed` breadcrumbs.
+- **Binaries read config from the process environment, period.** Use `os.Getenv` / `os.LookupEnv` only. Never parse `.env` files from Go code, never embed a dotenv loader, never bundle a secrets file reader. Loading environment variables is the operator's job — handled by the shell, `docker compose`, Kubernetes Secrets, or a dedicated secrets manager before the binary starts. This is a production codebase; treat it like one.
+
 ## Commands
 ```bash
 go test ./... -v      # Run tests
