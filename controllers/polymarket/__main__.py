@@ -84,12 +84,12 @@ class PolymarketController(Controller):
                     await asyncio.sleep(PING_INTERVAL)
                     await ws.send("PING")
 
-            asyncio.create_task(_ping_loop())
+            ping_task = asyncio.create_task(_ping_loop())
             async for raw in ws:
                 if not raw or raw == "PONG":
                     continue
                 msg = json.loads(raw)
-                if msg["topic"] != "crypto_prices" or msg["type"] != "update":
+                if msg.get("topic") != "crypto_prices" or msg.get("type") != "update":
                     raise RuntimeError(f"unexpected ws message: {msg!r}")
                 payload = msg["payload"]
                 symbol = payload["symbol"]
@@ -99,6 +99,7 @@ class PolymarketController(Controller):
                     name=f"polymarket/{symbol}",
                     value=json_format.ParseDict(payload, Value()),
                 ))
+            ping_task.cancel()
 
 
 async def main() -> None:
