@@ -72,21 +72,14 @@ class PolymarketController(Controller):
             return
 
         symbol_set = set(symbols)
-        async with websockets.connect(WS_URL) as ws:
+        async with websockets.connect(WS_URL, ping_interval=PING_INTERVAL) as ws:
             await ws.send(json.dumps({
                 "action": "subscribe",
                 "subscriptions": [{"topic": "crypto_prices", "type": "update"}],
             }))
             logger.info("ws connected, tracking %s", symbols)
-
-            async def _ping_loop() -> None:
-                while True:
-                    await asyncio.sleep(PING_INTERVAL)
-                    await ws.send("PING")
-
-            ping_task = asyncio.create_task(_ping_loop())
             async for raw in ws:
-                if not raw or raw == "PONG":
+                if not raw:
                     continue
                 msg = json.loads(raw)
                 if msg.get("topic") != "crypto_prices" or msg.get("type") != "update":
@@ -99,7 +92,6 @@ class PolymarketController(Controller):
                     name=f"polymarket/{symbol}",
                     value=json_format.ParseDict(payload, Value()),
                 ))
-            ping_task.cancel()
 
 
 async def main() -> None:
