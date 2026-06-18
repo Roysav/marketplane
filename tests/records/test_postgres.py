@@ -4,18 +4,14 @@ import asyncpg
 import pytest
 
 from apiserver.records import Record, RecordMetadata, RecordsClient
-from apiserver.records.postgres import PostgresRecordStorage, get_migrations
+from apiserver.records.postgres import PostgresRecordStorage
 from apiserver.types import Subject
-from apiserver.utils.migrations.postgres import PostgresMigrationClient
-
-_DSN = "postgresql://user:password@localhost:5432/records"
 
 
 @pytest.fixture
-async def pool():
-    p = await asyncpg.create_pool(_DSN)
+async def pool(records_dsn):
+    p = await asyncpg.create_pool(records_dsn)
     async with p.acquire() as conn:
-        await PostgresMigrationClient(conn, get_migrations(), "schema_migrations").apply()
         await conn.execute("TRUNCATE records CASCADE")
     yield p
     await p.close()

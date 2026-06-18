@@ -5,21 +5,17 @@ import asyncpg
 import pytest
 
 from apiserver.ledger import InsufficientBalanceError
-from apiserver.ledger.postgres import PostgresLedgerStorage, get_migrations
+from apiserver.ledger.postgres import PostgresLedgerStorage
 from apiserver.types import Subject
-from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
-_DSN = "postgresql://user:password@localhost:5432/ledger"
 _SUBJECT = Subject(type="instrument", tradespace="ts1", name="AAPL").key()
 
 
 @pytest.fixture
-async def pool():
-    p = await asyncpg.create_pool(_DSN)
+async def pool(ledger_dsn):
+    p = await asyncpg.create_pool(ledger_dsn)
     async with p.acquire() as conn:
-        await conn.execute("DROP TABLE IF EXISTS ledger_entries CASCADE")
-        await conn.execute("DROP TABLE IF EXISTS ledger_schema_migrations CASCADE")
-        await PostgresMigrationClient(conn, get_migrations(), "ledger_schema_migrations").apply()
+        await conn.execute("TRUNCATE ledger_entries RESTART IDENTITY")
     yield p
     await p.close()
 
