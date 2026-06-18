@@ -17,8 +17,9 @@ _SUBJECT = Subject(type="instrument", tradespace="ts1", name="AAPL").key()
 async def pool():
     p = await asyncpg.create_pool(_DSN)
     async with p.acquire() as conn:
+        await conn.execute("DROP TABLE IF EXISTS ledger_entries CASCADE")
+        await conn.execute("DROP TABLE IF EXISTS ledger_schema_migrations CASCADE")
         await PostgresMigrationClient(conn, get_migrations(), "ledger_schema_migrations").apply()
-        await conn.execute("TRUNCATE ledger_entries RESTART IDENTITY")
     yield p
     await p.close()
 

@@ -34,6 +34,11 @@ class PostgresRecordStorage:
                     "SELECT value FROM records WHERE starts_with(key, $1)",
                     prefix,
                 )
+            elif len(indices) == 0:
+                rows = await conn.fetch(
+                    "SELECT value FROM records WHERE starts_with(key, $1) AND indexes = ARRAY[]::TEXT[]",
+                    prefix,
+                )
             else:
                 rows = await conn.fetch(
                     "SELECT value FROM records WHERE starts_with(key, $1) AND indexes @> $2",
