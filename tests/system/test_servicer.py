@@ -13,11 +13,11 @@ def _dec(v: str) -> decimal_pb2.Decimal:
     return decimal_pb2.Decimal(value=v)
 
 
-def _rec(type_: str, tradespace: str, name: str, labels: dict | None = None) -> apiserver_pb2.Record:
+def _rec(type_: str, tradespace: str, name: str, labels: dict | None = None, revision: int = 0) -> apiserver_pb2.Record:
     return apiserver_pb2.Record(
         type=type_,
         tradespace=tradespace,
-        metadata=apiserver_pb2.RecordMetadata(name=name, labels=labels or {}),
+        metadata=apiserver_pb2.RecordMetadata(name=name, labels=labels or {}, revision=revision),
     )
 
 
@@ -212,9 +212,24 @@ async def test_create_and_get_record(stub):
 
 async def test_update_record(stub):
     await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "MSFT", {"tier": "large"})))
-    await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("asset", "nyse", "MSFT", {"tier": "mega"})))
+    await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("asset", "nyse", "MSFT", {"tier": "mega"}, revision=1)))
     resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="MSFT"))
     assert resp.record.metadata.labels["tier"] == "mega"
+    assert resp.record.metadata.revision == 1
+
+
+async def test_create_duplicate_record_conflicts(stub):
+    await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "DUP")))
+    with pytest.raises(grpc.aio.AioRpcError) as exc_info:
+        await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "DUP")))
+    assert exc_info.value.code() == grpc.StatusCode.ALREADY_EXISTS
+
+
+async def test_update_record_wrong_revision_conflicts(stub):
+    await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "STALE")))
+    with pytest.raises(grpc.aio.AioRpcError) as exc_info:
+        await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("asset", "nyse", "STALE", revision=2)))
+    assert exc_info.value.code() == grpc.StatusCode.ABORTED
 
 
 async def test_get_record_not_found(stub):
@@ -294,7 +309,7 @@ async def test_watch_records_update_event(stub):
     task = asyncio.create_task(_collect())
     await asyncio.sleep(0.05)
 
-    await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("bond", "us-treasury", "T-BILL-90D", {"rating": "AAA"})))
+    await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("bond", "us-treasury", "T-BILL-90D", {"rating": "AAA"}, revision=1)))
     await asyncio.sleep(0.05)
 
     call.cancel()

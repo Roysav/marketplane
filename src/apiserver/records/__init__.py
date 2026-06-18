@@ -6,8 +6,13 @@ import pydantic
 from apiserver.types import Subject
 
 
+class ConflictError(Exception):
+    pass
+
+
 class RecordStorage(Protocol):
-    async def set(self, key: str, value: bytes, indexes: list[str]): ...
+    async def create(self, key: str, value: bytes, indexes: list[str]) -> None: ...
+    async def update(self, key: str, value: bytes, indexes: list[str], expected_revision: int) -> None: ...
     async def get(self, key: str) -> bytes: ...
     async def list(self, prefix: str, indices: list[str] | None) -> list[bytes]: ...
 
@@ -15,6 +20,8 @@ class RecordStorage(Protocol):
 class RecordMetadata(pydantic.BaseModel):
     name: str
     labels: dict[str, str] = {}
+    revision: int = 0
+
 
 class Record(pydantic.BaseModel):
     type: str
@@ -23,16 +30,18 @@ class Record(pydantic.BaseModel):
     spec: dict[str, Any] = {}
 
     @classmethod
-    def from_bytes(cls, value: bytes) -> Record:
+    def from_bytes(cls, value: bytes) -> "Record":
         return cls(**json.loads(value))
 
     def to_bytes(self) -> bytes:
         return self.model_dump_json().encode()
 
+
 def _labels_to_indices(labels: dict[str, str] | None) -> list[str] | None:
     if labels is None:
         return None
     return [f"{k}={v}" for k, v in labels.items()]
+
 
 class RecordsClient:
     def __init__(self, backend: RecordStorage):
@@ -41,9 +50,14 @@ class RecordsClient:
     async def get_record(self, subject: Subject) -> Record:
         return Record.from_bytes(await self._backend.get(subject.key()))
 
-    async def set_record(self, record: Record) -> None:
+    async def create_record(self, record: Record) -> None:
+        record = record.model_copy(update={"metadata": record.metadata.model_copy(update={"revision": 0})})
         key = f"{record.type}/{record.tradespace}/{record.metadata.name}"
-        await self._backend.set(key, record.to_bytes(), _labels_to_indices(record.metadata.labels) or [])
+        await self._backend.create(key, record.to_bytes(), _labels_to_indices(record.metadata.labels) or [])
+
+    async def update_record(self, record: Record) -> None:
+        key = f"{record.type}/{record.tradespace}/{record.metadata.name}"
+        await self._backend.update(key, record.to_bytes(), _labels_to_indices(record.metadata.labels) or [], record.metadata.revision)
 
     async def list_records(self, type_: str, tradespace: str = None, labels: dict[str, str] = None, *, all_tradespaces=False) -> list[Record]:
         prefix = type_

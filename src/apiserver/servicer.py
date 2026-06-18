@@ -9,7 +9,7 @@ from google.type import decimal_pb2
 from marketplane.apiserver.v1 import apiserver_pb2, apiserver_pb2_grpc
 
 from apiserver.ledger import InsufficientBalanceError
-from apiserver.records import Record, RecordMetadata
+from apiserver.records import ConflictError, Record, RecordMetadata
 from apiserver.service import Service
 from apiserver.types import Subject
 
@@ -18,7 +18,7 @@ def _record_from_proto(r: apiserver_pb2.Record) -> Record:
     return Record(
         type=r.type,
         tradespace=r.tradespace,
-        metadata=RecordMetadata(name=r.metadata.name, labels=dict(r.metadata.labels)),
+        metadata=RecordMetadata(name=r.metadata.name, labels=dict(r.metadata.labels), revision=r.metadata.revision),
         spec=json_format.MessageToDict(r.spec),
     )
 
@@ -29,7 +29,7 @@ def _record_to_proto(r: Record) -> apiserver_pb2.Record:
     return apiserver_pb2.Record(
         type=r.type,
         tradespace=r.tradespace,
-        metadata=apiserver_pb2.RecordMetadata(name=r.metadata.name, labels=r.metadata.labels),
+        metadata=apiserver_pb2.RecordMetadata(name=r.metadata.name, labels=r.metadata.labels, revision=r.metadata.revision),
         spec=spec,
     )
 
@@ -111,11 +111,17 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
     # --- records ---
 
     async def CreateRecord(self, request: apiserver_pb2.CreateRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.CreateRecordResponse:
-        await self._service.create_record(_record_from_proto(request.record))
+        try:
+            await self._service.create_record(_record_from_proto(request.record))
+        except ConflictError:
+            await context.abort(grpc.StatusCode.ALREADY_EXISTS, f"record {request.record.type}/{request.record.tradespace}/{request.record.metadata.name} already exists")
         return apiserver_pb2.CreateRecordResponse()
 
     async def UpdateRecord(self, request: apiserver_pb2.UpdateRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.UpdateRecordResponse:
-        await self._service.update_record(_record_from_proto(request.record))
+        try:
+            await self._service.update_record(_record_from_proto(request.record))
+        except ConflictError:
+            await context.abort(grpc.StatusCode.ABORTED, f"record {request.record.type}/{request.record.tradespace}/{request.record.metadata.name} revision conflict")
         return apiserver_pb2.UpdateRecordResponse()
 
     async def GetRecord(self, request: apiserver_pb2.GetRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetRecordResponse:

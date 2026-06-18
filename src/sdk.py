@@ -17,6 +17,7 @@ class Record:
     name: str
     labels: dict[str, str] = field(default_factory=dict)
     spec: dict[str, Any] = field(default_factory=dict)
+    revision: int = 0
 
 
 @dataclass
@@ -50,7 +51,7 @@ def _record_to_proto(r: Record) -> apiserver_pb2.Record:
     return apiserver_pb2.Record(
         type=r.type,
         tradespace=r.tradespace,
-        metadata=apiserver_pb2.RecordMetadata(name=r.name, labels=r.labels),
+        metadata=apiserver_pb2.RecordMetadata(name=r.name, labels=r.labels, revision=r.revision),
         spec=spec,
     )
 
@@ -62,6 +63,7 @@ def _record_from_proto(r: apiserver_pb2.Record) -> Record:
         name=r.metadata.name,
         labels=dict(r.metadata.labels),
         spec=json_format.MessageToDict(r.spec),
+        revision=r.metadata.revision,
     )
 
 

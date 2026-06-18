@@ -41,11 +41,11 @@ class Service:
         return await self._ledger.balance(principal, currency)
 
     async def create_record(self, record: Record) -> None:
-        await self._records.set_record(record)
+        await self._records.create_record(record)
         await self._events.publish("created", Subject(type=record.type, tradespace=record.tradespace, name=record.metadata.name))
 
     async def update_record(self, record: Record) -> None:
-        await self._records.set_record(record)
+        await self._records.update_record(record)
         await self._events.publish("updated", Subject(type=record.type, tradespace=record.tradespace, name=record.metadata.name))
 
     async def get_record(self, subject: Subject) -> Record:

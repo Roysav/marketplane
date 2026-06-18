@@ -2,6 +2,8 @@ from pathlib import Path
 
 import asyncpg
 
+from apiserver.records import ConflictError
+
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 
@@ -13,12 +15,23 @@ class PostgresRecordStorage:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
-    async def set(self, key: str, value: bytes, indexes: list[str]) -> None:
+    async def create(self, key: str, value: bytes, indexes: list[str]) -> None:
         async with self._pool.acquire() as conn:
-            await conn.execute("""
-                INSERT INTO records (key, value, indexes) VALUES ($1, $2, $3)
-                ON CONFLICT (key) DO UPDATE SET value = excluded.value, indexes = excluded.indexes
-            """, key, value, indexes)
+            result = await conn.fetchval(
+                "INSERT INTO records (key, value, indexes, revision) VALUES ($1, $2, $3, 0) ON CONFLICT DO NOTHING RETURNING key",
+                key, value, indexes,
+            )
+            if result is None:
+                raise ConflictError(key)
+
+    async def update(self, key: str, value: bytes, indexes: list[str], expected_revision: int) -> None:
+        async with self._pool.acquire() as conn:
+            result = await conn.fetchval(
+                "UPDATE records SET value = $2, indexes = $3, revision = $4 WHERE key = $1 AND revision = $4 - 1 RETURNING key",
+                key, value, indexes, expected_revision,
+            )
+            if result is None:
+                raise ConflictError(key)
 
     async def get(self, key: str) -> bytes:
         async with self._pool.acquire() as conn:

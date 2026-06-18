@@ -3,7 +3,7 @@ import asyncio
 import asyncpg
 import pytest
 
-from apiserver.records import Record, RecordMetadata, RecordsClient
+from apiserver.records import ConflictError, Record, RecordMetadata, RecordsClient
 from apiserver.records.postgres import PostgresRecordStorage
 from apiserver.types import Subject
 
@@ -31,8 +31,8 @@ def _subject(type_="instrument", tradespace="ts1", name="AAPL"):
     return Subject(type=type_, tradespace=tradespace, name=name)
 
 
-def _record(type_="instrument", tradespace="ts1", name="AAPL", labels=None):
-    return Record(type=type_, tradespace=tradespace, metadata=RecordMetadata(name=name, labels=labels or {}))
+def _record(type_="instrument", tradespace="ts1", name="AAPL", labels=None, revision=0):
+    return Record(type=type_, tradespace=tradespace, metadata=RecordMetadata(name=name, labels=labels or {}, revision=revision))
 
 
 # --- correctness ---
@@ -41,7 +41,7 @@ def _record(type_="instrument", tradespace="ts1", name="AAPL", labels=None):
 @pytest.mark.asyncio
 async def test_set_and_get(client):
     r = _record()
-    await client.set_record(r)
+    await client.create_record(r)
     assert await client.get_record(_subject()) == r
 
 
@@ -54,19 +54,42 @@ async def test_get_missing_raises(client):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_set_overwrites(client):
-    await client.set_record(_record(name="AAPL"))
-    r2 = Record(type="instrument", tradespace="ts1", metadata=RecordMetadata(name="AAPL", labels={"env": "prod"}))
-    await client.set_record(r2)
+async def test_update_overwrites(client):
+    await client.create_record(_record(name="AAPL"))
+    r2 = _record(name="AAPL", labels={"env": "prod"}, revision=1)
+    await client.update_record(r2)
     assert await client.get_record(_subject()) == r2
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_create_existing_raises(client):
+    await client.create_record(_record(name="AAPL"))
+    with pytest.raises(ConflictError):
+        await client.create_record(_record(name="AAPL"))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_update_wrong_revision_raises(client):
+    await client.create_record(_record(name="AAPL"))
+    with pytest.raises(ConflictError):
+        await client.update_record(_record(name="AAPL", revision=2))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_update_missing_raises(client):
+    with pytest.raises(ConflictError):
+        await client.update_record(_record(name="GHOST", revision=1))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_list_by_type_and_tradespace(client):
-    await client.set_record(_record(name="AAPL"))
-    await client.set_record(_record(name="GOOG"))
-    await client.set_record(_record(tradespace="ts2", name="MSFT"))
+    await client.create_record(_record(name="AAPL"))
+    await client.create_record(_record(name="GOOG"))
+    await client.create_record(_record(tradespace="ts2", name="MSFT"))
 
     results = await client.list_records("instrument", tradespace="ts1")
     names = {r.metadata.name for r in results}
@@ -76,8 +99,8 @@ async def test_list_by_type_and_tradespace(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_all_tradespaces(client):
-    await client.set_record(_record(tradespace="ts1", name="AAPL"))
-    await client.set_record(_record(tradespace="ts2", name="GOOG"))
+    await client.create_record(_record(tradespace="ts1", name="AAPL"))
+    await client.create_record(_record(tradespace="ts2", name="GOOG"))
 
     results = await client.list_records("instrument", all_tradespaces=True)
     assert len(results) == 2
@@ -86,9 +109,9 @@ async def test_list_all_tradespaces(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_by_label(client):
-    await client.set_record(_record(name="AAPL", labels={"env": "prod"}))
-    await client.set_record(_record(name="GOOG", labels={"env": "staging"}))
-    await client.set_record(_record(name="MSFT", labels={"env": "prod"}))
+    await client.create_record(_record(name="AAPL", labels={"env": "prod"}))
+    await client.create_record(_record(name="GOOG", labels={"env": "staging"}))
+    await client.create_record(_record(name="MSFT", labels={"env": "prod"}))
 
     results = await client.list_records("instrument", tradespace="ts1", labels={"env": "prod"})
     names = {r.metadata.name for r in results}
@@ -98,9 +121,9 @@ async def test_list_by_label(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_by_multiple_labels(client):
-    await client.set_record(_record(name="AAPL", labels={"env": "prod", "region": "us"}))
-    await client.set_record(_record(name="GOOG", labels={"env": "prod", "region": "eu"}))
-    await client.set_record(_record(name="MSFT", labels={"env": "prod", "region": "us"}))
+    await client.create_record(_record(name="AAPL", labels={"env": "prod", "region": "us"}))
+    await client.create_record(_record(name="GOOG", labels={"env": "prod", "region": "eu"}))
+    await client.create_record(_record(name="MSFT", labels={"env": "prod", "region": "us"}))
 
     results = await client.list_records("instrument", tradespace="ts1", labels={"env": "prod", "region": "us"})
     names = {r.metadata.name for r in results}
@@ -110,7 +133,7 @@ async def test_list_by_multiple_labels(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_empty_labels_returns_empty(client):
-    await client.set_record(_record(name="AAPL", labels={"env": "prod"}))
+    await client.create_record(_record(name="AAPL", labels={"env": "prod"}))
     results = await client.list_records("instrument", tradespace="ts1", labels={})
     assert results == []
 
@@ -118,8 +141,8 @@ async def test_list_empty_labels_returns_empty(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_list_no_labels_returns_all(client):
-    await client.set_record(_record(name="AAPL", labels={"env": "prod"}))
-    await client.set_record(_record(name="GOOG"))
+    await client.create_record(_record(name="AAPL", labels={"env": "prod"}))
+    await client.create_record(_record(name="GOOG"))
     results = await client.list_records("instrument", tradespace="ts1")
     assert len(results) == 2
 
@@ -127,8 +150,8 @@ async def test_list_no_labels_returns_all(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_update_labels_replaces_old_indexes(client):
-    await client.set_record(_record(name="AAPL", labels={"env": "prod"}))
-    await client.set_record(Record(type="instrument", tradespace="ts1", metadata=RecordMetadata(name="AAPL", labels={"env": "staging"})))
+    await client.create_record(_record(name="AAPL", labels={"env": "prod"}))
+    await client.update_record(_record(name="AAPL", labels={"env": "staging"}, revision=1))
 
     prod = await client.list_records("instrument", tradespace="ts1", labels={"env": "prod"})
     staging = await client.list_records("instrument", tradespace="ts1", labels={"env": "staging"})
@@ -139,8 +162,8 @@ async def test_update_labels_replaces_old_indexes(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_type_isolation(client):
-    await client.set_record(_record(type_="instrument", name="AAPL"))
-    await client.set_record(_record(type_="portfolio", name="P1"))
+    await client.create_record(_record(type_="instrument", name="AAPL"))
+    await client.create_record(_record(type_="portfolio", name="P1"))
 
     instruments = await client.list_records("instrument", tradespace="ts1")
     portfolios = await client.list_records("portfolio", tradespace="ts1")
@@ -152,7 +175,7 @@ async def test_type_isolation(client):
 @pytest.mark.asyncio
 async def test_concurrent_sets_all_stored(client):
     records = [_record(name=f"R{i}") for i in range(20)]
-    await asyncio.gather(*[client.set_record(r) for r in records])
+    await asyncio.gather(*[client.create_record(r) for r in records])
 
     results = await client.list_records("instrument", tradespace="ts1")
     assert len(results) == 20
@@ -161,6 +184,6 @@ async def test_concurrent_sets_all_stored(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_concurrent_get_after_set(client, pool):
-    await asyncio.gather(*[client.set_record(_record(name=f"R{i}")) for i in range(10)])
+    await asyncio.gather(*[client.create_record(_record(name=f"R{i}")) for i in range(10)])
     results = await asyncio.gather(*[client.get_record(_subject(name=f"R{i}")) for i in range(10)])
     assert len(results) == 10

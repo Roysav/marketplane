@@ -34,8 +34,8 @@ def _subject(type_="instrument", tradespace="ts1", name="AAPL"):
     return Subject(type=type_, tradespace=tradespace, name=name)
 
 
-def _record(type_="instrument", tradespace="ts1", name="AAPL", labels=None):
-    return Record(type=type_, tradespace=tradespace, metadata=RecordMetadata(name=name, labels=labels or {}))
+def _record(type_="instrument", tradespace="ts1", name="AAPL", labels=None, revision=0):
+    return Record(type=type_, tradespace=tradespace, metadata=RecordMetadata(name=name, labels=labels or {}, revision=revision))
 
 
 # --- ticks ---
@@ -167,7 +167,7 @@ async def test_update_record_fires_updated_event(service, events_storage):
     await service.create_record(_record())
     task = asyncio.create_task(watcher())
     await asyncio.sleep(0)
-    await service.update_record(_record(labels={"env": "prod"}))
+    await service.update_record(_record(labels={"env": "prod"}, revision=1))
     await asyncio.wait_for(task, timeout=1.0)
 
     assert received[0].action == "updated"

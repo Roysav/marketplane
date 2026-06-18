@@ -82,6 +82,7 @@ message BalanceResponse {
 message RecordMetadata {
   string name = 1;
   map<string, string> labels = 2;
+  int64 revision = 3;
 }
 
 message Record {
