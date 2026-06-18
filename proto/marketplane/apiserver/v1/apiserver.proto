@@ -135,4 +135,5 @@ message RecordEvent {
   string type = 2;
   string tradespace = 3;
   string name = 4;
+  Record record = 5;
 }

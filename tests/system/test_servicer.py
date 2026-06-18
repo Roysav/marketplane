@@ -255,13 +255,13 @@ async def test_list_records_by_label(stub):
 
 
 async def test_watch_records_create_event(stub):
-    events: list[tuple[str, str]] = []
+    events: list[tuple[str, str, apiserver_pb2.Record]] = []
     call = stub.WatchRecords(apiserver_pb2.WatchRecordsRequest(type="bond", tradespace="us-treasury"))
 
     async def _collect():
         try:
             async for ev in call:
-                events.append((ev.action, ev.name))
+                events.append((ev.action, ev.name, ev.record))
         except (grpc.aio.AioRpcError, asyncio.CancelledError):
             pass
 
@@ -273,7 +273,9 @@ async def test_watch_records_create_event(stub):
 
     call.cancel()
     await asyncio.wait_for(task, timeout=1.0)
-    assert ("created", "T-NOTE-10Y") in events
+    assert any(action == "created" and name == "T-NOTE-10Y" for action, name, _ in events)
+    record = next(r for _, name, r in events if name == "T-NOTE-10Y")
+    assert record.metadata.name == "T-NOTE-10Y"
 
 
 async def test_watch_records_update_event(stub):

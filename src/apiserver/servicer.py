@@ -148,4 +148,11 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
             return
         async for event in stream:
-            yield apiserver_pb2.RecordEvent(action=event.action, type=event.subject.type, tradespace=event.subject.tradespace, name=event.subject.name)
+            record = await self._service.get_record(event.subject)
+            yield apiserver_pb2.RecordEvent(
+                action=event.action,
+                type=event.subject.type,
+                tradespace=event.subject.tradespace,
+                name=event.subject.name,
+                record=_record_to_proto(record),
+            )

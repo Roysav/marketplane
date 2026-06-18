@@ -25,6 +25,7 @@ class RecordEvent:
     type: str
     tradespace: str
     name: str
+    record: Record
 
 
 def _value_to_proto(x: Any) -> Value:
@@ -139,4 +140,4 @@ class MarketplaneClient:
             tradespace=tradespace or "",
             all_tradespaces=all_tradespaces,
         )):
-            yield RecordEvent(action=ev.action, type=ev.type, tradespace=ev.tradespace, name=ev.name)
+            yield RecordEvent(action=ev.action, type=ev.type, tradespace=ev.tradespace, name=ev.name, record=_record_from_proto(ev.record))
