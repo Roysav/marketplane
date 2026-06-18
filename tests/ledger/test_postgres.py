@@ -33,14 +33,14 @@ def storage(pool: asyncpg.Pool) -> PostgresLedgerStorage:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_grant_bypasses_balance_check(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("100")
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_allocate_reduces_balance(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
     await storage.allocate("alice", "bob", "USD", Decimal("40"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("60")
     assert await storage.balance("bob", "USD") == Decimal("40")
@@ -49,7 +49,7 @@ async def test_allocate_reduces_balance(storage: PostgresLedgerStorage) -> None:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_allocate_raises_on_insufficient_balance(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("50"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("50"), _SUBJECT)
     with pytest.raises(InsufficientBalanceError):
         await storage.allocate("alice", "bob", "USD", Decimal("100"), _SUBJECT)
 
@@ -64,8 +64,8 @@ async def test_allocate_raises_on_zero_balance(storage: PostgresLedgerStorage) -
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_balance_independent_per_currency(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
-    await storage.allocate("system", "alice", "EUR", Decimal("200"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
+    await storage.grant("system", "alice", "EUR", Decimal("200"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("100")
     assert await storage.balance("alice", "EUR") == Decimal("200")
 
@@ -75,7 +75,7 @@ async def test_balance_independent_per_currency(storage: PostgresLedgerStorage) 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_negative_amount_rejected(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
     with pytest.raises(ValueError):
         await storage.allocate("alice", "bob", "USD", Decimal("-1"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("100")
@@ -84,7 +84,7 @@ async def test_negative_amount_rejected(storage: PostgresLedgerStorage) -> None:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_zero_amount_rejected(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
     with pytest.raises(ValueError):
         await storage.allocate("alice", "bob", "USD", Decimal("0"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("100")
@@ -94,7 +94,7 @@ async def test_zero_amount_rejected(storage: PostgresLedgerStorage) -> None:
 @pytest.mark.asyncio
 async def test_negative_grant_rejected(storage: PostgresLedgerStorage) -> None:
     with pytest.raises(ValueError):
-        await storage.allocate("system", "alice", "USD", Decimal("-500"), _SUBJECT, from_balance_inf=True)
+        await storage.grant("system", "alice", "USD", Decimal("-500"), _SUBJECT)
     assert await storage.balance("alice", "USD") == Decimal("0")
 
 
@@ -103,7 +103,7 @@ async def test_negative_grant_rejected(storage: PostgresLedgerStorage) -> None:
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_race_condition_only_one_wins(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
 
     results = await asyncio.gather(
         *[storage.allocate("alice", "bob", "USD", Decimal("60"), _SUBJECT) for _ in range(5)],
@@ -120,7 +120,7 @@ async def test_race_condition_only_one_wins(storage: PostgresLedgerStorage) -> N
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_race_condition_exact_balance_spent_once(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
 
     results = await asyncio.gather(
         *[storage.allocate("alice", "bob", "USD", Decimal("100"), _SUBJECT) for _ in range(3)],
@@ -135,8 +135,8 @@ async def test_race_condition_exact_balance_spent_once(storage: PostgresLedgerSt
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_race_condition_independent_principals_dont_block(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
-    await storage.allocate("system", "bob", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
+    await storage.grant("system", "bob", "USD", Decimal("100"), _SUBJECT)
 
     results = await asyncio.gather(
         storage.allocate("alice", "charlie", "USD", Decimal("100"), _SUBJECT),
@@ -151,7 +151,7 @@ async def test_race_condition_independent_principals_dont_block(storage: Postgre
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_mass_concurrency_exact_spend_count(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("50"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("50"), _SUBJECT)
 
     results = await asyncio.gather(
         *[storage.allocate("alice", "bob", "USD", Decimal("1"), _SUBJECT) for _ in range(100)],
@@ -168,7 +168,7 @@ async def test_mass_concurrency_exact_spend_count(storage: PostgresLedgerStorage
 @pytest.mark.asyncio
 async def test_concurrent_grants_accumulate_correctly(storage: PostgresLedgerStorage) -> None:
     results = await asyncio.gather(
-        *[storage.allocate("system", "alice", "USD", Decimal("10"), _SUBJECT, from_balance_inf=True) for _ in range(50)],
+        *[storage.grant("system", "alice", "USD", Decimal("10"), _SUBJECT) for _ in range(50)],
         return_exceptions=True,
     )
     assert all(r is None for r in results)
@@ -178,8 +178,8 @@ async def test_concurrent_grants_accumulate_correctly(storage: PostgresLedgerSto
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_concurrent_cross_currency_isolation(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("100"), _SUBJECT, from_balance_inf=True)
-    await storage.allocate("system", "alice", "EUR", Decimal("50"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("100"), _SUBJECT)
+    await storage.grant("system", "alice", "EUR", Decimal("50"), _SUBJECT)
 
     usd_ops = [storage.allocate("alice", "bob", "USD", Decimal("20"), _SUBJECT) for _ in range(10)]
     eur_ops = [storage.allocate("alice", "bob", "EUR", Decimal("10"), _SUBJECT) for _ in range(10)]
@@ -198,7 +198,7 @@ async def test_concurrent_cross_currency_isolation(storage: PostgresLedgerStorag
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_ledger_entries_match_successful_allocations(storage: PostgresLedgerStorage, pool: asyncpg.Pool) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("50"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("50"), _SUBJECT)
 
     results = await asyncio.gather(
         *[storage.allocate("alice", "bob", "USD", Decimal("10"), _SUBJECT) for _ in range(20)],
@@ -227,7 +227,7 @@ async def test_failed_allocate_leaves_no_ledger_entry(storage: PostgresLedgerSto
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_balance_never_goes_negative(storage: PostgresLedgerStorage) -> None:
-    await storage.allocate("system", "alice", "USD", Decimal("10"), _SUBJECT, from_balance_inf=True)
+    await storage.grant("system", "alice", "USD", Decimal("10"), _SUBJECT)
 
     await asyncio.gather(
         *[storage.allocate("alice", "bob", "USD", Decimal("10"), _SUBJECT) for _ in range(20)],
