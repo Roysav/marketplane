@@ -64,7 +64,7 @@ def _record_from_proto(r: apiserver_pb2.Record) -> Record:
     )
 
 
-class SDK:
+class MarketplaneClient:
     def __init__(self, grpc_client: apiserver_pb2_grpc.ApiserverServiceStub) -> None:
         self._client = grpc_client
 
