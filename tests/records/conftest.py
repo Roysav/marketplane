@@ -4,7 +4,7 @@ import uuid
 import asyncpg
 import pytest
 
-from apiserver.records.postgres import get_migrations
+from apiserver.records.storage.postgres import get_migrations
 from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
 _ADMIN_DSN = "postgresql://user:password@localhost:5432/postgres"

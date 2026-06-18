@@ -8,8 +8,8 @@ from google.protobuf.struct_pb2 import Struct, Value
 from google.type import decimal_pb2
 from marketplane.apiserver.v1 import apiserver_pb2, apiserver_pb2_grpc
 
-from apiserver.ledger import InsufficientBalanceError
-from apiserver.records import ConflictError, Record, RecordMetadata
+from apiserver.errors import ServiceError
+from apiserver.records import Record, RecordMetadata
 from apiserver.service import Service
 from apiserver.types import Subject
 
@@ -66,8 +66,8 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
     async def GetTick(self, request: apiserver_pb2.GetTickRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetTickResponse:
         try:
             value = await self._service.get_tick(request.name)
-        except KeyError:
-            await context.abort(grpc.StatusCode.NOT_FOUND, f"tick {request.name!r} not found")
+        except ServiceError as e:
+            await context.abort(*e.as_grpc())
         return apiserver_pb2.GetTickResponse(value=_value_to_proto(value))
 
     async def SubscribeTick(self, request: apiserver_pb2.SubscribeTickRequest, context: grpc.aio.ServicerContext):
@@ -85,8 +85,8 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
                 _decimal_from_proto(request.amount),
                 request.subject,
             )
-        except InsufficientBalanceError as e:
-            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
+        except ServiceError as e:
+            await context.abort(*e.as_grpc())
         except ValueError as e:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
         return apiserver_pb2.AllocateResponse()
@@ -113,22 +113,22 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
     async def CreateRecord(self, request: apiserver_pb2.CreateRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.CreateRecordResponse:
         try:
             await self._service.create_record(_record_from_proto(request.record))
-        except ConflictError:
-            await context.abort(grpc.StatusCode.ALREADY_EXISTS, f"record {request.record.type}/{request.record.tradespace}/{request.record.metadata.name} already exists")
+        except ServiceError as e:
+            await context.abort(*e.as_grpc())
         return apiserver_pb2.CreateRecordResponse()
 
     async def UpdateRecord(self, request: apiserver_pb2.UpdateRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.UpdateRecordResponse:
         try:
             await self._service.update_record(_record_from_proto(request.record))
-        except ConflictError:
-            await context.abort(grpc.StatusCode.ABORTED, f"record {request.record.type}/{request.record.tradespace}/{request.record.metadata.name} revision conflict")
+        except ServiceError as e:
+            await context.abort(*e.as_grpc())
         return apiserver_pb2.UpdateRecordResponse()
 
     async def GetRecord(self, request: apiserver_pb2.GetRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetRecordResponse:
         try:
             record = await self._service.get_record(Subject(type=request.type, tradespace=request.tradespace, name=request.name))
-        except KeyError:
-            await context.abort(grpc.StatusCode.NOT_FOUND, f"record {request.type}/{request.tradespace}/{request.name} not found")
+        except ServiceError as e:
+            await context.abort(*e.as_grpc())
         return apiserver_pb2.GetRecordResponse(record=_record_to_proto(record))
 
     async def ListRecords(self, request: apiserver_pb2.ListRecordsRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.ListRecordsResponse:

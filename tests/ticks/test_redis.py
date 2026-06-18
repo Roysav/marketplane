@@ -3,7 +3,8 @@ import asyncio
 import pytest
 import redis.asyncio as redis
 
-from apiserver.ticks.redis import RedisTickStorage
+from apiserver.ticks.storage.exceptions import KeyNotFound
+from apiserver.ticks.storage.redis import RedisTickStorage
 
 _DSN = "redis://localhost:6379/2"
 
@@ -39,7 +40,7 @@ async def test_publish_overwrites(storage):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_missing_raises(storage):
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyNotFound):
         await storage.get("price.UNKNOWN")
 
 

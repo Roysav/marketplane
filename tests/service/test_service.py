@@ -3,15 +3,16 @@ from decimal import Decimal
 
 import pytest
 
+from apiserver.errors import InsufficientBalance, TickNotFound
 from apiserver.events import Event, EventsClient
-from apiserver.events.memory import MemoryEventStorage
-from apiserver.ledger import InsufficientBalanceError, LedgerClient
-from apiserver.ledger.memory import MemoryLedgerStorage
+from apiserver.events.storage.memory import MemoryEventStorage
+from apiserver.ledger import LedgerClient
+from apiserver.ledger.storage.memory import MemoryLedgerStorage
 from apiserver.records import Record, RecordMetadata, RecordsClient
-from apiserver.records.memory import MemoryRecordStorage
+from apiserver.records.storage.memory import MemoryRecordStorage
 from apiserver.service import Service
 from apiserver.ticks import TicksClient
-from apiserver.ticks.memory import MemoryTickStorage
+from apiserver.ticks.storage.memory import MemoryTickStorage
 from apiserver.types import Subject
 
 
@@ -48,7 +49,7 @@ async def test_publish_tick_stores_value(service):
 
 @pytest.mark.asyncio
 async def test_get_tick_missing_raises(service):
-    with pytest.raises(KeyError):
+    with pytest.raises(TickNotFound):
         await service.get_tick("price.UNKNOWN")
 
 
@@ -104,7 +105,7 @@ async def test_allocate_moves_funds(service):
 
 @pytest.mark.asyncio
 async def test_allocate_raises_on_insufficient(service):
-    with pytest.raises(InsufficientBalanceError):
+    with pytest.raises(InsufficientBalance):
         await service.allocate("alice", "bob", "USD", Decimal("1"), "instrument/ts1/AAPL")
 
 

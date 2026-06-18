@@ -4,15 +4,15 @@ import pytest
 from marketplane.apiserver.v1 import apiserver_pb2_grpc
 
 from apiserver.events import EventsClient
-from apiserver.events.memory import MemoryEventStorage
+from apiserver.events.storage.memory import MemoryEventStorage
 from apiserver.ledger import LedgerClient
-from apiserver.ledger.memory import MemoryLedgerStorage
+from apiserver.ledger.storage.memory import MemoryLedgerStorage
 from apiserver.records import RecordsClient
-from apiserver.records.memory import MemoryRecordStorage
+from apiserver.records.storage.memory import MemoryRecordStorage
 from apiserver.service import Service
 from apiserver.servicer import ApiserverServicer
 from apiserver.ticks import TicksClient
-from apiserver.ticks.memory import MemoryTickStorage
+from apiserver.ticks.storage.memory import MemoryTickStorage
 
 
 @pytest.fixture

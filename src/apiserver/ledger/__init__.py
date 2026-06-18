@@ -3,9 +3,8 @@ from typing import Protocol
 
 import pydantic
 
-
-class InsufficientBalanceError(Exception):
-    pass
+from apiserver.errors import InsufficientBalance
+from apiserver.ledger.storage.exceptions import InsufficientBalanceError
 
 
 class LedgerEntry(pydantic.BaseModel):
@@ -27,7 +26,10 @@ class LedgerClient:
         self._backend = backend
 
     async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
-        await self._backend.allocate(from_principal, to_principal, currency, amount, subject)
+        try:
+            await self._backend.allocate(from_principal, to_principal, currency, amount, subject)
+        except InsufficientBalanceError:
+            raise InsufficientBalance(from_principal, currency, amount)
 
     async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
         await self._backend.grant(from_principal, to_principal, currency, amount, subject)

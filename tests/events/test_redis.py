@@ -5,7 +5,7 @@ import redis.asyncio as redis
 
 from apiserver.events import Event
 from apiserver.types import Subject
-from apiserver.events.redis import RedisEventStorage
+from apiserver.events.storage.redis import RedisEventStorage
 
 _DSN = "redis://localhost:6379/3"
 

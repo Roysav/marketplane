@@ -2,6 +2,9 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
+from apiserver.errors import TickNotFound
+from apiserver.ticks.storage.exceptions import KeyNotFound
+
 
 class TickStorage(Protocol):
     async def publish(self, key: str, value: str) -> None: ...
@@ -17,7 +20,11 @@ class TicksClient:
         await self._backend.publish(name, json.dumps(value))
 
     async def get(self, name: str) -> Any:
-        return json.loads(await self._backend.get(name))
+        try:
+            raw = await self._backend.get(name)
+        except KeyNotFound:
+            raise TickNotFound(name)
+        return json.loads(raw)
 
     async def subscribe(self, name: str) -> AsyncIterator[Any]:
         async for raw in self._backend.subscribe(name):

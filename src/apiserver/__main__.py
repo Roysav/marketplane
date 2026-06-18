@@ -5,15 +5,15 @@ import redis.asyncio as redis
 
 from apiserver.config import Settings
 from apiserver.events import EventsClient
-from apiserver.events.redis import RedisEventStorage
+from apiserver.events.storage.redis import RedisEventStorage
 from apiserver.ledger import LedgerClient
-from apiserver.ledger.postgres import PostgresLedgerStorage, get_migrations as ledger_migrations
+from apiserver.ledger.storage.postgres import PostgresLedgerStorage, get_migrations as ledger_migrations
 from apiserver.records import RecordsClient
-from apiserver.records.postgres import PostgresRecordStorage, get_migrations as records_migrations
+from apiserver.records.storage.postgres import PostgresRecordStorage, get_migrations as records_migrations
 from apiserver.server import serve
 from apiserver.service import Service
 from apiserver.ticks import TicksClient
-from apiserver.ticks.redis import RedisTickStorage
+from apiserver.ticks.storage.redis import RedisTickStorage
 from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
 

@@ -4,8 +4,8 @@ from decimal import Decimal
 import asyncpg
 import pytest
 
-from apiserver.ledger import InsufficientBalanceError
-from apiserver.ledger.postgres import PostgresLedgerStorage
+from apiserver.ledger.storage.exceptions import InsufficientBalanceError
+from apiserver.ledger.storage.postgres import PostgresLedgerStorage
 from apiserver.types import Subject
 
 _SUBJECT = Subject(type="instrument", tradespace="ts1", name="AAPL").key()

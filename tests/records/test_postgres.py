@@ -3,8 +3,9 @@ import asyncio
 import asyncpg
 import pytest
 
-from apiserver.records import ConflictError, Record, RecordMetadata, RecordsClient
-from apiserver.records.postgres import PostgresRecordStorage
+from apiserver.errors import RecordAlreadyExists, RecordNotFound, RecordRevisionConflict
+from apiserver.records import Record, RecordMetadata, RecordsClient
+from apiserver.records.storage.postgres import PostgresRecordStorage
 from apiserver.types import Subject
 
 
@@ -48,7 +49,7 @@ async def test_set_and_get(client):
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_missing_raises(client):
-    with pytest.raises(KeyError):
+    with pytest.raises(RecordNotFound):
         await client.get_record(_subject(name="UNKNOWN"))
 
 
@@ -65,7 +66,7 @@ async def test_update_overwrites(client):
 @pytest.mark.asyncio
 async def test_create_existing_raises(client):
     await client.create_record(_record(name="AAPL"))
-    with pytest.raises(ConflictError):
+    with pytest.raises(RecordAlreadyExists):
         await client.create_record(_record(name="AAPL"))
 
 
@@ -73,14 +74,14 @@ async def test_create_existing_raises(client):
 @pytest.mark.asyncio
 async def test_update_wrong_revision_raises(client):
     await client.create_record(_record(name="AAPL"))
-    with pytest.raises(ConflictError):
+    with pytest.raises(RecordRevisionConflict):
         await client.update_record(_record(name="AAPL", revision=2))
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
 async def test_update_missing_raises(client):
-    with pytest.raises(ConflictError):
+    with pytest.raises(RecordRevisionConflict):
         await client.update_record(_record(name="GHOST", revision=1))
 
 

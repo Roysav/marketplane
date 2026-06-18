@@ -1,4 +1,4 @@
-from apiserver.records import ConflictError
+from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
 
 
 class MemoryRecordStorage:
@@ -9,7 +9,7 @@ class MemoryRecordStorage:
 
     async def create(self, key: str, value: bytes, indexes: list[str]) -> None:
         if key in self._store:
-            raise ConflictError(key)
+            raise KeyAlreadyExists(key)
         self._store[key] = value
         self._revisions[key] = 0
         for index in indexes:
@@ -17,7 +17,7 @@ class MemoryRecordStorage:
 
     async def update(self, key: str, value: bytes, indexes: list[str], expected_revision: int) -> None:
         if key not in self._store or self._revisions[key] != expected_revision - 1:
-            raise ConflictError(key)
+            raise RevisionMismatch(key)
         for idx_set in self._indexes.values():
             idx_set.discard(key)
         self._store[key] = value
@@ -26,6 +26,8 @@ class MemoryRecordStorage:
             self._indexes.setdefault(index, set()).add(key)
 
     async def get(self, key: str) -> bytes:
+        if key not in self._store:
+            raise KeyNotFound(key)
         return self._store[key]
 
     async def list(self, prefix: str, indices: list[str] | None) -> list[bytes]:

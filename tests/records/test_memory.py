@@ -1,7 +1,7 @@
 import pytest
 
-from apiserver.records import ConflictError
-from apiserver.records.memory import MemoryRecordStorage
+from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
+from apiserver.records.storage.memory import MemoryRecordStorage
 
 
 @pytest.fixture
@@ -17,14 +17,14 @@ async def test_create_and_get(storage: MemoryRecordStorage) -> None:
 
 @pytest.mark.asyncio
 async def test_get_missing_key_raises(storage: MemoryRecordStorage) -> None:
-    with pytest.raises(KeyError):
+    with pytest.raises(KeyNotFound):
         await storage.get("missing")
 
 
 @pytest.mark.asyncio
 async def test_create_existing_key_raises(storage: MemoryRecordStorage) -> None:
     await storage.create("k1", b"v1", [])
-    with pytest.raises(ConflictError):
+    with pytest.raises(KeyAlreadyExists):
         await storage.create("k1", b"v2", [])
 
 
@@ -38,13 +38,13 @@ async def test_update_bumps_revision(storage: MemoryRecordStorage) -> None:
 @pytest.mark.asyncio
 async def test_update_wrong_revision_raises(storage: MemoryRecordStorage) -> None:
     await storage.create("k1", b"v1", [])
-    with pytest.raises(ConflictError):
+    with pytest.raises(RevisionMismatch):
         await storage.update("k1", b"v2", [], 2)
 
 
 @pytest.mark.asyncio
 async def test_update_missing_key_raises(storage: MemoryRecordStorage) -> None:
-    with pytest.raises(ConflictError):
+    with pytest.raises(RevisionMismatch):
         await storage.update("missing", b"v", [], 1)
 
 

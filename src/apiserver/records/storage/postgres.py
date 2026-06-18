@@ -2,7 +2,7 @@ from pathlib import Path
 
 import asyncpg
 
-from apiserver.records import ConflictError
+from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -22,7 +22,7 @@ class PostgresRecordStorage:
                 key, value, indexes,
             )
             if result is None:
-                raise ConflictError(key)
+                raise KeyAlreadyExists(key)
 
     async def update(self, key: str, value: bytes, indexes: list[str], expected_revision: int) -> None:
         async with self._pool.acquire() as conn:
@@ -31,13 +31,13 @@ class PostgresRecordStorage:
                 key, value, indexes, expected_revision,
             )
             if result is None:
-                raise ConflictError(key)
+                raise RevisionMismatch(key)
 
     async def get(self, key: str) -> bytes:
         async with self._pool.acquire() as conn:
             result = await conn.fetchval("SELECT value FROM records WHERE key = $1", key)
             if result is None:
-                raise KeyError(key)
+                raise KeyNotFound(key)
             return bytes(result)
 
     async def list(self, prefix: str, indices: list[str] | None) -> list[bytes]:

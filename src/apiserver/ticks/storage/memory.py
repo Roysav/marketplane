@@ -2,6 +2,8 @@ import asyncio
 from collections import defaultdict
 from collections.abc import AsyncIterator
 
+from apiserver.ticks.storage.exceptions import KeyNotFound
+
 
 class MemoryTickStorage:
     def __init__(self) -> None:
@@ -14,6 +16,8 @@ class MemoryTickStorage:
             await queue.put(value)
 
     async def get(self, key: str) -> str:
+        if key not in self._values:
+            raise KeyNotFound(key)
         return self._values[key]
 
     async def subscribe(self, key: str) -> AsyncIterator[str]:
