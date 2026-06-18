@@ -43,9 +43,6 @@ Thumbs.db
 *.log
 logs/
 
-# Local config (contains credentials)
-config.yaml
-
 # buf export cache
 .buf-export/
 
