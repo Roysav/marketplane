@@ -3,8 +3,6 @@ from typing import Protocol
 
 import pydantic
 
-from apiserver.types import Subject
-
 
 class InsufficientBalanceError(Exception):
     pass
@@ -28,11 +26,11 @@ class LedgerClient:
     def __init__(self, backend: LedgerStorage) -> None:
         self._backend = backend
 
-    async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: Subject) -> None:
-        await self._backend.allocate(from_principal, to_principal, currency, amount, subject.key())
+    async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
+        await self._backend.allocate(from_principal, to_principal, currency, amount, subject)
 
-    async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: Subject) -> None:
-        await self._backend.grant(from_principal, to_principal, currency, amount, subject.key())
+    async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
+        await self._backend.grant(from_principal, to_principal, currency, amount, subject)
 
     async def balance(self, principal: str, currency: str) -> Decimal:
         return await self._backend.balance(principal, currency)

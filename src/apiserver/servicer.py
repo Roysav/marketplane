@@ -14,14 +14,6 @@ from apiserver.service import Service
 from apiserver.types import Subject
 
 
-def _subject_from_proto(s: apiserver_pb2.Subject) -> Subject:
-    return Subject(type=s.type, tradespace=s.tradespace, name=s.name)
-
-
-def _subject_to_proto(s: Subject) -> apiserver_pb2.Subject:
-    return apiserver_pb2.Subject(type=s.type, tradespace=s.tradespace, name=s.name)
-
-
 def _record_from_proto(r: apiserver_pb2.Record) -> Record:
     return Record(
         type=r.type,
@@ -91,7 +83,7 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
                 request.to_principal,
                 request.currency,
                 _decimal_from_proto(request.amount),
-                _subject_from_proto(request.subject),
+                request.subject,
             )
         except InsufficientBalanceError as e:
             await context.abort(grpc.StatusCode.FAILED_PRECONDITION, str(e))
@@ -106,7 +98,7 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
                 request.to_principal,
                 request.currency,
                 _decimal_from_proto(request.amount),
-                _subject_from_proto(request.subject),
+                request.subject,
             )
         except ValueError as e:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
@@ -128,10 +120,9 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
 
     async def GetRecord(self, request: apiserver_pb2.GetRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetRecordResponse:
         try:
-            record = await self._service.get_record(_subject_from_proto(request.subject))
+            record = await self._service.get_record(Subject(type=request.type, tradespace=request.tradespace, name=request.name))
         except KeyError:
-            s = request.subject
-            await context.abort(grpc.StatusCode.NOT_FOUND, f"record {s.type}/{s.tradespace}/{s.name} not found")
+            await context.abort(grpc.StatusCode.NOT_FOUND, f"record {request.type}/{request.tradespace}/{request.name} not found")
         return apiserver_pb2.GetRecordResponse(record=_record_to_proto(record))
 
     async def ListRecords(self, request: apiserver_pb2.ListRecordsRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.ListRecordsResponse:
@@ -157,4 +148,4 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
             return
         async for event in stream:
-            yield apiserver_pb2.RecordEvent(action=event.action, subject=_subject_to_proto(event.subject))
+            yield apiserver_pb2.RecordEvent(action=event.action, type=event.subject.type, tradespace=event.subject.tradespace, name=event.subject.name)

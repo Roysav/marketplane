@@ -21,12 +21,6 @@ service ApiserverService {
   rpc WatchRecords(WatchRecordsRequest) returns (stream RecordEvent);
 }
 
-message Subject {
-  string type = 1;
-  string tradespace = 2;
-  string name = 3;
-}
-
 // --- ticks ---
 
 message PublishTickRequest {
@@ -59,7 +53,7 @@ message AllocateRequest {
   string to_principal = 2;
   string currency = 3;
   google.type.Decimal amount = 4;
-  Subject subject = 5;
+  string subject = 5;
 }
 
 message AllocateResponse {}
@@ -69,7 +63,7 @@ message GrantRequest {
   string to_principal = 2;
   string currency = 3;
   google.type.Decimal amount = 4;
-  Subject subject = 5;
+  string subject = 5;
 }
 
 message GrantResponse {}
@@ -110,7 +104,9 @@ message UpdateRecordRequest {
 message UpdateRecordResponse {}
 
 message GetRecordRequest {
-  Subject subject = 1;
+  string type = 1;
+  string tradespace = 2;
+  string name = 3;
 }
 
 message GetRecordResponse {
@@ -136,5 +132,7 @@ message WatchRecordsRequest {
 
 message RecordEvent {
   string action = 1;
-  Subject subject = 2;
+  string type = 2;
+  string tradespace = 3;
+  string name = 4;
 }

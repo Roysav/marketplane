@@ -13,10 +13,6 @@ def _dec(v: str) -> decimal_pb2.Decimal:
     return decimal_pb2.Decimal(value=v)
 
 
-def _subj(type_: str, tradespace: str, name: str) -> apiserver_pb2.Subject:
-    return apiserver_pb2.Subject(type=type_, tradespace=tradespace, name=name)
-
-
 def _rec(type_: str, tradespace: str, name: str, labels: dict | None = None) -> apiserver_pb2.Record:
     return apiserver_pb2.Record(
         type=type_,
@@ -137,7 +133,7 @@ async def test_grant_increases_balance(stub):
         to_principal="alice",
         currency="USD",
         amount=_dec("500.00"),
-        subject=_subj("account", "main", "grant-1"),
+        subject="account/main/grant-1",
     ))
     resp = await stub.Balance(apiserver_pb2.BalanceRequest(principal="alice", currency="USD"))
     assert Decimal(resp.balance.value) == Decimal("500.00")
@@ -154,14 +150,14 @@ async def test_allocate_moves_funds(stub):
         to_principal="trader",
         currency="USD",
         amount=_dec("100.00"),
-        subject=_subj("account", "main", "fund-trader"),
+        subject="account/main/fund-trader",
     ))
     await stub.Allocate(apiserver_pb2.AllocateRequest(
         from_principal="trader",
         to_principal="exchange",
         currency="USD",
         amount=_dec("40.00"),
-        subject=_subj("trade", "nyse", "T001"),
+        subject="trade/nyse/T001",
     ))
     trader = await stub.Balance(apiserver_pb2.BalanceRequest(principal="trader", currency="USD"))
     exchange = await stub.Balance(apiserver_pb2.BalanceRequest(principal="exchange", currency="USD"))
@@ -176,7 +172,7 @@ async def test_allocate_insufficient_balance(stub):
             to_principal="rich",
             currency="USD",
             amount=_dec("1.00"),
-            subject=_subj("trade", "nyse", "doomed"),
+            subject="trade/nyse/doomed",
         ))
     assert exc_info.value.code() == grpc.StatusCode.FAILED_PRECONDITION
 
@@ -187,14 +183,14 @@ async def test_multiple_currencies_are_independent(stub):
         to_principal="multi",
         currency="USD",
         amount=_dec("200.00"),
-        subject=_subj("account", "main", "fund-usd"),
+        subject="account/main/fund-usd",
     ))
     await stub.Grant(apiserver_pb2.GrantRequest(
         from_principal="mint",
         to_principal="multi",
         currency="EUR",
         amount=_dec("100.00"),
-        subject=_subj("account", "main", "fund-eur"),
+        subject="account/main/fund-eur",
     ))
     usd = await stub.Balance(apiserver_pb2.BalanceRequest(principal="multi", currency="USD"))
     eur = await stub.Balance(apiserver_pb2.BalanceRequest(principal="multi", currency="EUR"))
@@ -207,7 +203,7 @@ async def test_multiple_currencies_are_independent(stub):
 
 async def test_create_and_get_record(stub):
     await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "AAPL", {"sector": "tech"})))
-    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(subject=_subj("asset", "nyse", "AAPL")))
+    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="AAPL"))
     assert resp.record.type == "asset"
     assert resp.record.tradespace == "nyse"
     assert resp.record.metadata.name == "AAPL"
@@ -217,13 +213,13 @@ async def test_create_and_get_record(stub):
 async def test_update_record(stub):
     await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("asset", "nyse", "MSFT", {"tier": "large"})))
     await stub.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_rec("asset", "nyse", "MSFT", {"tier": "mega"})))
-    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(subject=_subj("asset", "nyse", "MSFT")))
+    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="MSFT"))
     assert resp.record.metadata.labels["tier"] == "mega"
 
 
 async def test_get_record_not_found(stub):
     with pytest.raises(grpc.aio.AioRpcError) as exc_info:
-        await stub.GetRecord(apiserver_pb2.GetRecordRequest(subject=_subj("asset", "nyse", "DOES_NOT_EXIST")))
+        await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="DOES_NOT_EXIST"))
     assert exc_info.value.code() == grpc.StatusCode.NOT_FOUND
 
 
@@ -265,7 +261,7 @@ async def test_watch_records_create_event(stub):
     async def _collect():
         try:
             async for ev in call:
-                events.append((ev.action, ev.subject.name))
+                events.append((ev.action, ev.name))
         except (grpc.aio.AioRpcError, asyncio.CancelledError):
             pass
 
@@ -311,7 +307,7 @@ async def test_watch_records_all_tradespaces(stub):
     async def _collect():
         try:
             async for ev in call:
-                events.append((ev.subject.tradespace, ev.subject.name))
+                events.append((ev.tradespace, ev.name))
         except (grpc.aio.AioRpcError, asyncio.CancelledError):
             pass
 

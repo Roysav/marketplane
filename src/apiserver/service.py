@@ -31,10 +31,10 @@ class Service:
     def subscribe_tick(self, name: str) -> AsyncIterator[Any]:
         return self._ticks.subscribe(name)
 
-    async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: Subject) -> None:
+    async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
         await self._ledger.allocate(from_principal, to_principal, currency, amount, subject)
 
-    async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: Subject) -> None:
+    async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
         await self._ledger.grant(from_principal, to_principal, currency, amount, subject)
 
     async def balance(self, principal: str, currency: str) -> Decimal:

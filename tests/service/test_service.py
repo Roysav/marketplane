@@ -90,14 +90,14 @@ async def test_publish_tick_does_not_fire_event(service, events_storage):
 
 @pytest.mark.asyncio
 async def test_grant_then_balance(service):
-    await service.grant("system", "alice", "USD", Decimal("100"), _subject())
+    await service.grant("system", "alice", "USD", Decimal("100"), "instrument/ts1/AAPL")
     assert await service.balance("alice", "USD") == Decimal("100")
 
 
 @pytest.mark.asyncio
 async def test_allocate_moves_funds(service):
-    await service.grant("system", "alice", "USD", Decimal("100"), _subject())
-    await service.allocate("alice", "bob", "USD", Decimal("40"), _subject())
+    await service.grant("system", "alice", "USD", Decimal("100"), "instrument/ts1/AAPL")
+    await service.allocate("alice", "bob", "USD", Decimal("40"), "instrument/ts1/AAPL")
     assert await service.balance("alice", "USD") == Decimal("60")
     assert await service.balance("bob", "USD") == Decimal("40")
 
@@ -105,7 +105,7 @@ async def test_allocate_moves_funds(service):
 @pytest.mark.asyncio
 async def test_allocate_raises_on_insufficient(service):
     with pytest.raises(InsufficientBalanceError):
-        await service.allocate("alice", "bob", "USD", Decimal("1"), _subject())
+        await service.allocate("alice", "bob", "USD", Decimal("1"), "instrument/ts1/AAPL")
 
 
 @pytest.mark.asyncio
@@ -118,8 +118,8 @@ async def test_ledger_does_not_fire_event(service, events_storage):
 
     task = asyncio.create_task(watcher())
     await asyncio.sleep(0)
-    await service.grant("system", "alice", "USD", Decimal("100"), _subject())
-    await service.allocate("alice", "bob", "USD", Decimal("50"), _subject())
+    await service.grant("system", "alice", "USD", Decimal("100"), "instrument/ts1/AAPL")
+    await service.allocate("alice", "bob", "USD", Decimal("50"), "instrument/ts1/AAPL")
     await asyncio.sleep(0.05)
     task.cancel()
 
