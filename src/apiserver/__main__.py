@@ -17,8 +17,6 @@ from apiserver.ticks.redis import RedisTickStorage
 from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
 
-def _pg_dsn(uri: str) -> str:
-    return uri.replace("postgresql+asyncpg://", "postgresql://")
 
 
 def main() -> None:
@@ -26,11 +24,11 @@ def main() -> None:
 
 
 async def _run(settings: Settings) -> None:
-    ledger_pool = await asyncpg.create_pool(_pg_dsn(settings.ledger.storage.postgres.connection_uri))
+    ledger_pool = await asyncpg.create_pool(settings.ledger.storage.postgres.connection_uri)
     async with ledger_pool.acquire() as conn:
         await PostgresMigrationClient(conn, ledger_migrations(), "ledger_schema_migrations").apply()
 
-    records_pool = await asyncpg.create_pool(_pg_dsn(settings.records.storage.postgres.connection_uri))
+    records_pool = await asyncpg.create_pool(settings.records.storage.postgres.connection_uri)
     async with records_pool.acquire() as conn:
         await PostgresMigrationClient(conn, records_migrations(), "records_schema_migrations").apply()
 
