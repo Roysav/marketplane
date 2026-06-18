@@ -36,19 +36,8 @@ _RECORD_ACTIONS = frozenset({
 
 
 class Controller:
-    def __init__(
-        self,
-        client: MarketplaneClient,
-        *,
-        worker_limit: int | None,
-        idle_timeout: float,
-        exit_timeout: float,
-        reconnect_backoff: float,
-    ) -> None:
+    def __init__(self, client: MarketplaneClient, *, reconnect_backoff: float) -> None:
         self._client = client
-        self._worker_limit = worker_limit
-        self._idle_timeout = idle_timeout
-        self._exit_timeout = exit_timeout
         self._reconnect_backoff = reconnect_backoff
         self._registry = HandlerRegistry()
         self._record_types: set[str] = set()
@@ -86,14 +75,12 @@ class Controller:
 
         return decorator
 
+    def _on_worker_error(self, exc: BaseException) -> None:
+        logger.error("controller worker failed", exc_info=exc)
+
     async def run(self) -> None:
-        scheduler = Scheduler(limit=self._worker_limit)
-        multiplexer = Multiplexer(
-            scheduler=scheduler,
-            registry=self._registry,
-            idle_timeout=self._idle_timeout,
-            exit_timeout=self._exit_timeout,
-        )
+        scheduler = Scheduler(exception_handler=self._on_worker_error)
+        multiplexer = Multiplexer(scheduler=scheduler, registry=self._registry)
         feeders = [
             asyncio.create_task(
                 self._feed(
@@ -136,6 +123,7 @@ class Controller:
             try:
                 async for item in make_stream():
                     await multiplexer.feed(parse(item))
-            except AioRpcError:
-                logger.exception("%s failed; reconnecting", label)
+            except AioRpcError as err:
+                err.add_note(f"while handling {label!r}")
+                logger.exception(err)
                 await asyncio.sleep(self._reconnect_backoff)

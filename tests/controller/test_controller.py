@@ -29,7 +29,7 @@ def _event(action, name, revision=0, labels=None):
 
 
 def _controller(client) -> Controller:
-    return Controller(client, worker_limit=None, idle_timeout=0.05, exit_timeout=1.0, reconnect_backoff=0.01)
+    return Controller(client, reconnect_backoff=0.01)
 
 
 async def _run_until(ctrl, done, timeout=2.0):

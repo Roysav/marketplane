@@ -3,39 +3,39 @@ import asyncio
 from controller._scheduler import Scheduler
 
 
+def _reraise(exc: BaseException) -> None:
+    raise exc
+
+
 async def test_runs_spawned_coro():
-    sched = Scheduler()
+    sched = Scheduler(exception_handler=_reraise)
     ran = asyncio.Event()
 
     async def job() -> None:
         ran.set()
 
-    await sched.spawn(job())
+    sched.spawn(job())
     await asyncio.wait_for(ran.wait(), timeout=1.0)
-    await sched.close()
+    await sched.wait()
 
 
-async def test_respects_limit():
-    sched = Scheduler(limit=2)
-    active = 0
-    peak = 0
+async def test_wait_returns_when_all_done():
+    sched = Scheduler(exception_handler=_reraise)
+    count = 0
 
     async def job() -> None:
-        nonlocal active, peak
-        active += 1
-        peak = max(peak, active)
-        await asyncio.sleep(0.02)
-        active -= 1
+        nonlocal count
+        await asyncio.sleep(0.01)
+        count += 1
 
-    for _ in range(6):
-        await sched.spawn(job())
+    for _ in range(5):
+        sched.spawn(job())
     await sched.wait()
-    await sched.close()
-    assert peak == 2
+    assert count == 5
 
 
 async def test_close_cancels_running():
-    sched = Scheduler()
+    sched = Scheduler(exception_handler=_reraise)
     completed = False
 
     async def job() -> None:
@@ -43,7 +43,7 @@ async def test_close_cancels_running():
         await asyncio.sleep(10)
         completed = True
 
-    await sched.spawn(job())
+    sched.spawn(job())
     await asyncio.sleep(0.01)
     await sched.close()
     assert completed is False
@@ -56,8 +56,7 @@ async def test_exception_handler_called():
     async def job() -> None:
         raise ValueError("boom")
 
-    await sched.spawn(job())
+    sched.spawn(job())
     await sched.wait()
-    await sched.close()
     assert len(errors) == 1
     assert isinstance(errors[0], ValueError)

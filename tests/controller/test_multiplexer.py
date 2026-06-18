@@ -22,12 +22,16 @@ def _note(name="AAPL", revision=0):
     return RecordNotification(NotificationType.RECORD_UPDATED, _rec(name=name, revision=revision))
 
 
-def _build(handler: Handler, *, idle_timeout=0.05, exit_timeout=1.0, limit=None):
+def _build(handler: Handler):
     registry = HandlerRegistry()
     registry.register(handler, Selector(types=_ALL_RECORD, record_type="asset"))
-    scheduler = Scheduler(limit=limit)
-    mux = Multiplexer(scheduler=scheduler, registry=registry, idle_timeout=idle_timeout, exit_timeout=exit_timeout)
+    scheduler = Scheduler(exception_handler=_reraise)
+    mux = Multiplexer(scheduler=scheduler, registry=registry)
     return mux, scheduler
+
+
+def _reraise(exc: BaseException) -> None:
+    raise exc
 
 
 async def test_same_key_serialized():
@@ -61,17 +65,6 @@ async def test_different_keys_concurrent():
     await mux.feed(_note(name="MSFT"))
     await mux.drain()
     assert peak == 2
-
-
-async def test_idle_worker_is_collected():
-    async def handler(_: RecordNotification) -> None:
-        pass
-
-    mux, scheduler = _build(handler, idle_timeout=0.02)
-    await mux.feed(_note())
-    await asyncio.sleep(0.1)
-    assert mux._streams == {}
-    await scheduler.close()
 
 
 async def test_drain_processes_backlog():
