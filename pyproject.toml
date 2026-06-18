@@ -67,6 +67,7 @@ marketplane = ["py.typed"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+pythonpath = ["src", "gen"]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --cov=apiserver --cov-report=term-missing"
 markers = [

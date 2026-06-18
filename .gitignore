@@ -48,3 +48,6 @@ logs/
 
 # Claude memory
 .claude/
+
+# Reference material (cloned upstream repos)
+.context/
