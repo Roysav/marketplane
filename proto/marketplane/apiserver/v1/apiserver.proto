@@ -129,6 +129,7 @@ message WatchRecordsRequest {
   string type = 1;
   string tradespace = 2;
   bool all_tradespaces = 3;
+  map<string, string> labels = 4;
 }
 
 message RecordEvent {

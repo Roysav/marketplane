@@ -10,7 +10,7 @@ from google.type import decimal_pb2
 from marketplane.apiserver.v1 import apiserver_pb2, apiserver_pb2_grpc
 
 
-@dataclass
+@dataclass(frozen=True)
 class Record:
     type: str
     tradespace: str
@@ -20,7 +20,7 @@ class Record:
     revision: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class RecordEvent:
     action: str
     type: str
@@ -134,12 +134,14 @@ class MarketplaneClient:
         self,
         type_: str,
         tradespace: str | None = None,
+        labels: dict[str, str] | None = None,
         *,
         all_tradespaces: bool = False,
     ) -> AsyncIterator[RecordEvent]:
         async for ev in self._client.WatchRecords(apiserver_pb2.WatchRecordsRequest(
             type=type_,
             tradespace=tradespace or "",
+            labels=labels or {},
             all_tradespaces=all_tradespaces,
         )):
             yield RecordEvent(action=ev.action, type=ev.type, tradespace=ev.tradespace, name=ev.name, record=_record_from_proto(ev.record))

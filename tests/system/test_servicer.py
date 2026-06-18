@@ -339,3 +339,29 @@ async def test_watch_records_all_tradespaces(stub):
     await asyncio.wait_for(task, timeout=1.0)
     assert ("sp500", "SPX") in events
     assert ("nasdaq", "NDX") in events
+
+
+async def test_watch_records_filters_by_labels(stub):
+    names: list[str] = []
+    call = stub.WatchRecords(apiserver_pb2.WatchRecordsRequest(type="fund", tradespace="us", labels={"tier": "gold"}))
+
+    async def _collect():
+        try:
+            async for ev in call:
+                names.append(ev.name)
+        except (grpc.aio.AioRpcError, asyncio.CancelledError):
+            pass
+
+    task = asyncio.create_task(_collect())
+    await asyncio.sleep(0.05)
+
+    await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("fund", "us", "GOLD1", {"tier": "gold"})))
+    await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("fund", "us", "SILVER1", {"tier": "silver"})))
+    await stub.CreateRecord(apiserver_pb2.CreateRecordRequest(record=_rec("fund", "us", "GOLD2", {"tier": "gold"})))
+    await asyncio.sleep(0.05)
+
+    call.cancel()
+    await asyncio.wait_for(task, timeout=1.0)
+    assert "GOLD1" in names
+    assert "GOLD2" in names
+    assert "SILVER1" not in names

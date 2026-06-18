@@ -153,8 +153,11 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
         except ValueError as e:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
             return
+        labels = dict(request.labels)
         async for event in stream:
             record = await self._service.get_record(event.subject)
+            if labels and not labels.items() <= record.metadata.labels.items():
+                continue
             yield apiserver_pb2.RecordEvent(
                 action=event.action,
                 type=event.subject.type,
