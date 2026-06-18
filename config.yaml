@@ -1,0 +1,23 @@
+ledger:
+  storage:
+    backend: "postgres"
+    postgres:
+      connectionUri: "postgresql://user:password@localhost:5432/marketplane"
+
+records:
+  storage:
+    backend: "postgres"
+    postgres:
+      connectionUri: "postgresql://user:password@localhost:5432/marketplane"
+
+events:
+  storage:
+    backend: "redis"
+    redis:
+      connectionUri: "redis://localhost:6379/0"
+
+ticks:
+  storage:
+    backend: "redis"
+    redis:
+      connectionUri: "redis://localhost:6379/1"
