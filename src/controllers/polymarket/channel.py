@@ -14,24 +14,37 @@ class MarketChannel:
     def __init__(self, url: str):
         self._url = url
         self._assets: set[str] = set()
+        self._subscribed: set[str] = set()
         self._ws: ClientConnection | None = None
 
     async def update(self, asset_ids: Iterable[str]) -> None:
-        self._assets = set(asset_ids)
+        new = set(asset_ids)
+        if new == self._assets:
+            return
+        self._assets = new
         if self._ws is not None:
-            await self._ws.send(self._subscription())
+            await self._apply()
 
-    def _subscription(self) -> str:
-        return json.dumps({
-            "assets_ids": sorted(self._assets),
-            "type": "market",
-            "custom_feature_enabled": True,
-        })
+    async def _apply(self) -> None:
+        assert self._ws is not None
+        if not self._subscribed:
+            if self._assets:
+                await self._ws.send(json.dumps({"assets_ids": sorted(self._assets), "type": "market", "custom_feature_enabled": True}))
+                self._subscribed = set(self._assets)
+            return
+        added = self._assets - self._subscribed
+        removed = self._subscribed - self._assets
+        if added:
+            await self._ws.send(json.dumps({"operation": "subscribe", "assets_ids": sorted(added)}))
+        if removed:
+            await self._ws.send(json.dumps({"operation": "unsubscribe", "assets_ids": sorted(removed)}))
+        self._subscribed = set(self._assets)
 
     async def run(self) -> None:
         async for ws in connect(self._url):
             self._ws = ws
-            if self._assets:
-                await ws.send(self._subscription())
+            self._subscribed = set()
+            await self._apply()
             async for message in ws:
                 print(message)
+            self._ws = None
