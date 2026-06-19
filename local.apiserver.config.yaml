@@ -4,12 +4,12 @@ server:
 ledger:
   storage:
     postgres:
-      connectionUri: "postgresql://user:password@localhost:5432/marketplane"
+      connectionUri: "postgresql://user@localhost:5432/marketplane"
 
 records:
   storage:
     postgres:
-      connectionUri: "postgresql://user:password@localhost:5432/marketplane"
+      connectionUri: "postgresql://user@localhost:5432/marketplane"
 
 events:
   storage:

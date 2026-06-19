@@ -6,12 +6,9 @@ import redis.asyncio as redis
 from apiserver.ticks.storage.exceptions import KeyNotFound
 from apiserver.ticks.storage.redis import RedisTickStorage
 
-_DSN = "redis://localhost:6379/2"
-
-
 @pytest.fixture
-async def client():
-    r = redis.from_url(_DSN)
+async def client(redis_url):
+    r = redis.from_url(redis_url)
     await r.flushdb()
     yield r
     await r.aclose()

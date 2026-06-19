@@ -3,8 +3,8 @@ services:
     image: postgres:17
     environment:
       POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
       POSTGRES_DB: marketplane
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:

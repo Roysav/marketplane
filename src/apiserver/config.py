@@ -71,5 +71,5 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         default_path = Path(__file__).parent / "default.config.yaml"
-        override_path = Path(os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", "apiserver.config.yaml"))
+        override_path = Path(os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", "local.apiserver.config.yaml"))
         return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)

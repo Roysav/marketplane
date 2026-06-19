@@ -7,12 +7,9 @@ from apiserver.events import Event
 from apiserver.types import Subject
 from apiserver.events.storage.redis import RedisEventStorage
 
-_DSN = "redis://localhost:6379/3"
-
-
 @pytest.fixture
-async def client():
-    r = redis.from_url(_DSN)
+async def client(redis_url):
+    r = redis.from_url(redis_url)
     await r.flushdb()
     yield r
     await r.aclose()

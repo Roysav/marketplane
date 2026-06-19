@@ -30,7 +30,7 @@ class PolymarketConfig(BaseModel):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="POLYMARKET_CONTROLLER_",
+        env_prefix="MARKETPLANE_POLYMARKET_CONTROLLER_",
         env_nested_delimiter="_",
     )
 
@@ -49,5 +49,5 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         default_path = Path(__file__).parent / "default.config.yaml"
-        override_path = Path(os.environ.get("POLYMARKET_CONTROLLER_CONFIG_FILE", "polymarket.config.yaml"))
+        override_path = Path(os.environ.get("MARKETPLANE_POLYMARKET_CONTROLLER_CONFIG_FILE", "local.polymarket.config.yaml"))
         return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)
