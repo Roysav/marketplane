@@ -15,10 +15,11 @@ class Channel(Protocol):
 
 
 class MarketChannel:
-    def __init__(self, url: str, on_message: Callable[[str], Awaitable[None]], *, max_assets: int):
+    def __init__(self, url: str, on_message: Callable[[str], Awaitable[None]], *, max_assets: int, ping_timeout: float):
         self._url = url
         self._on_message = on_message
         self._max_assets = max_assets
+        self._ping_timeout = ping_timeout
         self._assets: set[str] = set()
         self._subscribed: set[str] = set()
         self._capped = False
@@ -58,7 +59,7 @@ class MarketChannel:
         self._subscribed = set(self._assets)
 
     async def run(self) -> None:
-        async for ws in connect(self._url, ping_timeout=30):
+        async for ws in connect(self._url, ping_timeout=self._ping_timeout):
             self._ws = ws
             self._subscribed = set()
             try:

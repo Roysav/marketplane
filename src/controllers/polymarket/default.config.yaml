@@ -13,7 +13,7 @@ logging:
     handlers: [console]
 
 marketplane:
-  address: "localhost:50051"
+  maxMessageBytes: 268435456
 
 controller:
   reconnectBackoff: 1.0
@@ -26,3 +26,4 @@ polymarket:
   pageSize: 100
   maxConcurrency: 10
   maxAssets: 10000
+  pingTimeout: 30.0

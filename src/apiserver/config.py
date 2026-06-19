@@ -3,7 +3,9 @@ from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, CliSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict, YamlConfigSettingsSource
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+from utils.config import layered_yaml_sources
 
 
 class PostgresConfig(BaseModel):
@@ -12,6 +14,7 @@ class PostgresConfig(BaseModel):
 
 class RedisConfig(BaseModel):
     connection_uri: str = Field(alias="connectionUri")
+    socket_timeout: float | None = Field(alias="socketTimeout")
 
 
 class PostgresStorage(BaseModel):
@@ -40,13 +43,19 @@ class TicksSettings(BaseModel):
     storage: RedisStorage
 
 
+class ServerConfig(BaseModel):
+    address: str
+    max_message_bytes: int = Field(alias="maxMessageBytes")
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="MARKETPLANE_",
-        env_nested_delimiter="__",
+        env_prefix="MARKETPLANE_APISERVER_",
+        env_nested_delimiter="_",
     )
 
     logging: dict[str, Any]
+    server: ServerConfig
     ledger: LedgerSettings
     records: RecordsSettings
     events: EventsSettings
@@ -61,9 +70,6 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        yaml_file = os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", str(Path(__file__).parent / "config.yaml"))
-        return (
-            CliSettingsSource(settings_cls, cli_parse_args=True, cli_ignore_unknown_args=True),
-            env_settings,
-            YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file),
-        )
+        default_path = Path(__file__).parent / "default.config.yaml"
+        override_path = Path(os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", "apiserver.config.yaml"))
+        return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)

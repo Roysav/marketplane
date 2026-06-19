@@ -3,11 +3,14 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings, CliSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict, YamlConfigSettingsSource
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
+
+from utils.config import layered_yaml_sources
 
 
 class MarketplaneConfig(BaseModel):
     address: str
+    max_message_bytes: int = Field(alias="maxMessageBytes")
 
 
 class ControllerConfig(BaseModel):
@@ -22,12 +25,13 @@ class PolymarketConfig(BaseModel):
     page_size: int = Field(alias="pageSize")
     max_concurrency: int = Field(alias="maxConcurrency")
     max_assets: int = Field(alias="maxAssets")
+    ping_timeout: float = Field(alias="pingTimeout")
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="POLYMARKET_",
-        env_nested_delimiter="__",
+        env_prefix="POLYMARKET_CONTROLLER_",
+        env_nested_delimiter="_",
     )
 
     logging: dict[str, Any]
@@ -44,9 +48,6 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        yaml_file = os.environ.get("POLYMARKET_CONTROLLER_CONFIG_FILE", str(Path(__file__).parent / "config.yaml"))
-        return (
-            CliSettingsSource(settings_cls, cli_parse_args=True, cli_ignore_unknown_args=True),
-            env_settings,
-            YamlConfigSettingsSource(settings_cls, yaml_file=yaml_file),
-        )
+        default_path = Path(__file__).parent / "default.config.yaml"
+        override_path = Path(os.environ.get("POLYMARKET_CONTROLLER_CONFIG_FILE", "polymarket.config.yaml"))
+        return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)

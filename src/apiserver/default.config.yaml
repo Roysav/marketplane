@@ -1,0 +1,36 @@
+logging:
+  version: 1
+  disable_existing_loggers: false
+  formatters:
+    standard:
+      format: "%(asctime)s %(levelname)s %(name)s %(message)s"
+  handlers:
+    console:
+      class: "logging.StreamHandler"
+      formatter: standard
+  root:
+    level: "INFO"
+    handlers: [console]
+
+server:
+  maxMessageBytes: 268435456
+
+ledger:
+  storage:
+    backend: "postgres"
+
+records:
+  storage:
+    backend: "postgres"
+
+events:
+  storage:
+    backend: "redis"
+    redis:
+      socketTimeout: null
+
+ticks:
+  storage:
+    backend: "redis"
+    redis:
+      socketTimeout: null
