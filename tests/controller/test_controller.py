@@ -172,3 +172,19 @@ async def test_on_existing_resyncs_periodically():
 
     await _run_until(ctrl, done)
     assert count >= 2
+
+
+async def test_on_schedule_fires_periodically():
+    ctrl = _controller(FakeClient())
+    count = 0
+    done = asyncio.Event()
+
+    @ctrl.on_schedule(0.05)
+    async def tick():
+        nonlocal count
+        count += 1
+        if count >= 3:
+            done.set()
+
+    await _run_until(ctrl, done)
+    assert count >= 3

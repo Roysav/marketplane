@@ -1,7 +1,7 @@
 import asyncio
 import functools
 import logging
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from grpc.aio import AioRpcError
@@ -44,6 +44,7 @@ class Controller:
         self._record_types: set[str] = set()
         self._resync_types: set[str] = set()
         self._tick_names: set[str] = set()
+        self._schedules: list[tuple[float, Callable[[], Awaitable[None]]]] = []
 
     def on_record_event(
         self,
@@ -103,6 +104,13 @@ class Controller:
 
         return decorator
 
+    def on_schedule(self, interval: float) -> Callable[[Callable[[], Awaitable[None]]], Callable[[], Awaitable[None]]]:
+        def decorator(handler: Callable[[], Awaitable[None]]) -> Callable[[], Awaitable[None]]:
+            self._schedules.append((interval, handler))
+            return handler
+
+        return decorator
+
     def _on_worker_error(self, exc: BaseException) -> None:
         logger.error("controller worker failed", exc_info=exc)
 
@@ -142,6 +150,9 @@ class Controller:
                 name=f"resync {type_}",
             )
             for type_ in self._resync_types
+        ] + [
+            asyncio.create_task(self._schedule_loop(interval, handler), name=f"schedule {interval}s")
+            for interval, handler in self._schedules
         ]
         try:
             await asyncio.gather(*feeders)
@@ -172,3 +183,8 @@ class Controller:
             for record in await self._client.list_records(type_, all_tradespaces=True):
                 yield record
             await asyncio.sleep(self._resync_interval)
+
+    async def _schedule_loop(self, interval: float, handler: Callable[[], Awaitable[None]]) -> None:
+        while True:
+            await handler()
+            await asyncio.sleep(interval)
