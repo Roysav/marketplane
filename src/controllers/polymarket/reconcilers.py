@@ -1,9 +1,15 @@
+import logging
 from typing import Any
+
+import httpx
+from grpc.aio import AioRpcError
 
 from controller import Controller, RecordNotification
 from .api import Event, Market, PolymarketAPI
 from .channel import Channel
 from sdk import MarketplaneClient, Record
+
+logger = logging.getLogger(__name__)
 
 TRADESPACE = "polymarket"
 EVENT_TYPE = "alphav1/polymarket/Event"
@@ -39,9 +45,13 @@ class EventImporter:
         controller.on_schedule(interval)(self._import)
 
     async def _import(self) -> None:
-        for event in await self._api.list_events():
-            record = Record(type=EVENT_TYPE, tradespace=TRADESPACE, name=event.event_id, spec=_event_spec(event))
-            await self._client.apply_record(record)
+        try:
+            events = await self._api.list_events()
+            for event in events:
+                record = Record(type=EVENT_TYPE, tradespace=TRADESPACE, name=event.event_id, spec=_event_spec(event))
+                await self._client.apply_record(record)
+        except (httpx.HTTPError, AioRpcError):
+            logger.exception("polymarket event import failed")
 
 
 class EventReconciler:

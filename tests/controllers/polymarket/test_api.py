@@ -11,7 +11,7 @@ async def test_list_events_paginates_and_stops_at_offset_cap():
         return httpx.Response(200, json=[{"id": f"e{offset + i}", "slug": "s", "title": "t", "markets": []} for i in range(100)])
 
     async with httpx.AsyncClient(base_url="http://test", transport=httpx.MockTransport(handler)) as client:
-        events = await PolymarketAPI(client, page_size=100).list_events()
+        events = await PolymarketAPI(client, page_size=100, max_concurrency=4).list_events()
 
     assert len(events) == 200
     assert events[0].event_id == "e0"

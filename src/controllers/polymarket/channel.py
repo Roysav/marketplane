@@ -1,8 +1,12 @@
 import json
+import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Protocol
 
 from websockets.asyncio.client import ClientConnection, connect
+from websockets.exceptions import ConnectionClosed
+
+logger = logging.getLogger(__name__)
 
 
 class Channel(Protocol):
@@ -11,15 +15,24 @@ class Channel(Protocol):
 
 
 class MarketChannel:
-    def __init__(self, url: str, on_message: Callable[[str], Awaitable[None]]):
+    def __init__(self, url: str, on_message: Callable[[str], Awaitable[None]], *, max_assets: int):
         self._url = url
         self._on_message = on_message
+        self._max_assets = max_assets
         self._assets: set[str] = set()
         self._subscribed: set[str] = set()
+        self._capped = False
         self._ws: ClientConnection | None = None
 
     async def update(self, asset_ids: Iterable[str]) -> None:
         new = set(asset_ids)
+        if len(new) > self._max_assets:
+            if not self._capped:
+                logger.warning("asset count %d exceeds max_assets %d; subscribing to a subset", len(new), self._max_assets)
+                self._capped = True
+            new = set(sorted(new)[: self._max_assets])
+        else:
+            self._capped = False
         if new == self._assets:
             return
         self._assets = new
@@ -42,10 +55,13 @@ class MarketChannel:
         self._subscribed = set(self._assets)
 
     async def run(self) -> None:
-        async for ws in connect(self._url):
+        async for ws in connect(self._url, ping_timeout=30):
             self._ws = ws
             self._subscribed = set()
-            await self._apply()
-            async for message in ws:
-                await self._on_message(message)
+            try:
+                await self._apply()
+                async for message in ws:
+                    await self._on_message(message)
+            except ConnectionClosed:
+                logger.warning("market channel disconnected; reconnecting")
             self._ws = None

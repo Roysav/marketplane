@@ -18,6 +18,8 @@ class PolymarketConfig(BaseModel):
     gamma_api_url: str = Field(alias="gammaApiUrl")
     cron_interval: float = Field(alias="cronInterval")
     page_size: int = Field(alias="pageSize")
+    max_concurrency: int = Field(alias="maxConcurrency")
+    max_assets: int = Field(alias="maxAssets")
 
 
 class Settings(BaseSettings):

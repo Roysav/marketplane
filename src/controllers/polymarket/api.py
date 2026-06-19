@@ -1,3 +1,4 @@
+import asyncio
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -46,15 +47,20 @@ def _event(raw: dict[str, Any]) -> Event:
 
 
 class PolymarketAPI:
-    def __init__(self, client: httpx.AsyncClient, *, page_size: int):
+    def __init__(self, client: httpx.AsyncClient, *, page_size: int, max_concurrency: int):
         self._client = client
         self._page_size = page_size
+        self._semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def _get(self, url: str, **kwargs: Any) -> httpx.Response:
+        async with self._semaphore:
+            return await self._client.get(url, **kwargs)
 
     async def list_events(self) -> list[Event]:
         events: list[Event] = []
         offset = 0
         while True:
-            response = await self._client.get(
+            response = await self._get(
                 "/events",
                 params={"limit": self._page_size, "offset": offset, "closed": "false"},
             )
@@ -68,6 +74,6 @@ class PolymarketAPI:
             offset += self._page_size
 
     async def get_market(self, market_id: str) -> Market:
-        response = await self._client.get(f"/markets/{market_id}")
+        response = await self._get(f"/markets/{market_id}")
         response.raise_for_status()
         return _market(response.json())

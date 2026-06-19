@@ -10,3 +10,5 @@ polymarket:
   gammaApiUrl: "https://gamma-api.polymarket.com"
   cronInterval: 60.0
   pageSize: 100
+  maxConcurrency: 10
+  maxAssets: 10000

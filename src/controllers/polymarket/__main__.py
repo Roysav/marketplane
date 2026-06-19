@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 import grpc.aio
 import httpx
@@ -12,8 +13,11 @@ from .reconcilers import AssetSubscriber, EventImporter, EventReconciler, Market
 from .trades import TradePublisher
 from sdk import MarketplaneClient
 
+logger = logging.getLogger(__name__)
+
 
 async def _run(settings: Settings) -> None:
+    logger.info("polymarket controller starting")
     async with (
         grpc.aio.insecure_channel(settings.marketplane.address) as grpc_channel,
         httpx.AsyncClient(base_url=settings.polymarket.gamma_api_url, headers={"User-Agent": "marketplane-polymarket/0"}) as http_client,
@@ -24,8 +28,8 @@ async def _run(settings: Settings) -> None:
             reconnect_backoff=settings.controller.reconnect_backoff,
             resync_interval=settings.controller.resync_interval,
         )
-        channel = MarketChannel(settings.polymarket.market_channel_url, TradePublisher(client).on_message)
-        api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size)
+        channel = MarketChannel(settings.polymarket.market_channel_url, TradePublisher(client).on_message, max_assets=settings.polymarket.max_assets)
+        api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size, max_concurrency=settings.polymarket.max_concurrency)
 
         AssetSubscriber(controller, channel)
         MarketReconciler(controller, client)
@@ -36,6 +40,7 @@ async def _run(settings: Settings) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     asyncio.run(_run(Settings()))
 
 

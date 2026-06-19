@@ -1,5 +1,7 @@
 import asyncio
 
+import httpx
+
 from controller import Controller
 from controllers.polymarket.api import Event, Market
 from controllers.polymarket.reconcilers import (
@@ -85,3 +87,19 @@ async def test_cron_imports_events_then_cascades_to_asset_subscription():
     assert [r.name for r in client.of_type(MARKET_TYPE)] == ["m1"]
     assert {r.name for r in client.of_type(ASSET_TYPE)} == {"tokA", "tokB"}
     assert channel.updates[-1] == {"tokA", "tokB"}
+
+
+class BoomAPI:
+    async def list_events(self):
+        raise httpx.ConnectError("boom")
+
+    async def get_market(self, market_id):
+        raise httpx.ConnectError("boom")
+
+
+async def test_import_logs_and_continues_on_api_error():
+    client = FakeClient()
+    controller = Controller(client, reconnect_backoff=0.01, resync_interval=10.0)
+    importer = EventImporter(controller, client, BoomAPI(), interval=10.0)
+    await importer._import()
+    assert client.of_type(EVENT_TYPE) == []
