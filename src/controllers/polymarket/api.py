@@ -1,5 +1,6 @@
 import asyncio
 import json
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -56,8 +57,7 @@ class PolymarketAPI:
         async with self._semaphore:
             return await self._client.get(url, **kwargs)
 
-    async def list_events(self) -> list[Event]:
-        events: list[Event] = []
+    async def list_events(self) -> AsyncIterator[Event]:
         offset = 0
         while True:
             response = await self._get(
@@ -65,12 +65,13 @@ class PolymarketAPI:
                 params={"limit": self._page_size, "offset": offset, "closed": "false"},
             )
             if offset > 0 and response.status_code == 422:
-                return events
+                return
             response.raise_for_status()
             page = response.json()
-            events.extend(_event(raw) for raw in page)
+            for raw in page:
+                yield _event(raw)
             if len(page) < self._page_size:
-                return events
+                return
             offset += self._page_size
 
     async def get_market(self, market_id: str) -> Market:

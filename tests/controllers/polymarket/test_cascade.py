@@ -17,8 +17,13 @@ class FakeAPI:
     def __init__(self, events, markets):
         self._events = events
         self._markets = {m.market_id: m for m in markets}
-    async def list_events(self): return self._events
-    async def get_market(self, market_id): return self._markets[market_id]
+
+    async def list_events(self):
+        for event in self._events:
+            yield event
+
+    async def get_market(self, market_id):
+        return self._markets[market_id]
 
 
 class FakeChannel:
@@ -64,6 +69,7 @@ async def test_cron_imports_events_then_cascades_to_asset_subscription(client):
 class BoomAPI:
     async def list_events(self):
         raise httpx.ConnectError("boom")
+        yield
 
     async def get_market(self, market_id):
         raise httpx.ConnectError("boom")

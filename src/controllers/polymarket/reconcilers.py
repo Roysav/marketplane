@@ -46,8 +46,7 @@ class EventImporter:
 
     async def _import(self) -> None:
         try:
-            events = await self._api.list_events()
-            for event in events:
+            async for event in self._api.list_events():
                 record = Record(type=EVENT_TYPE, tradespace=TRADESPACE, name=event.event_id, spec=_event_spec(event))
                 await self._client.apply_record(record)
         except (httpx.HTTPError, AioRpcError):
