@@ -6,11 +6,11 @@ import httpx
 from marketplane.apiserver.v1 import apiserver_pb2_grpc
 
 from controller import Controller
-from .api import PolymarketAPI
-from .channel import MarketChannel
-from .config import Settings
-from .reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
-from .trades import TradePublisher
+from controllers.polymarket.api import PolymarketAPI
+from controllers.polymarket.channel import MarketChannel
+from controllers.polymarket.config import Settings
+from controllers.polymarket.reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
+from controllers.polymarket.trades import TradePublisher
 from sdk import MarketplaneClient
 
 logger = logging.getLogger(__name__)
