@@ -1,6 +1,7 @@
 from .api import Event, Market, PolymarketAPI
 from .channel import Channel, MarketChannel
 from .config import Settings
+from .trades import LAST_TRADE_TICK, TradePublisher
 from .reconcilers import (
     ASSET_TYPE,
     EVENT_TYPE,
@@ -23,8 +24,10 @@ __all__ = [
     "MarketReconciler",
     "EventReconciler",
     "EventImporter",
+    "TradePublisher",
     "ASSET_TYPE",
     "MARKET_TYPE",
     "EVENT_TYPE",
     "TRADESPACE",
+    "LAST_TRADE_TICK",
 ]

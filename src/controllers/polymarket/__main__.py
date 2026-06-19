@@ -9,6 +9,7 @@ from .api import PolymarketAPI
 from .channel import MarketChannel
 from .config import Settings
 from .reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
+from .trades import TradePublisher
 from sdk import MarketplaneClient
 
 
@@ -23,7 +24,7 @@ async def _run(settings: Settings) -> None:
             reconnect_backoff=settings.controller.reconnect_backoff,
             resync_interval=settings.controller.resync_interval,
         )
-        channel = MarketChannel(settings.polymarket.market_channel_url)
+        channel = MarketChannel(settings.polymarket.market_channel_url, TradePublisher(client).on_message)
         api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size)
 
         AssetSubscriber(controller, channel)

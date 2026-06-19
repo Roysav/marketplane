@@ -1,5 +1,5 @@
 import json
-from collections.abc import Iterable
+from collections.abc import Awaitable, Callable, Iterable
 from typing import Protocol
 
 from websockets.asyncio.client import ClientConnection, connect
@@ -11,8 +11,9 @@ class Channel(Protocol):
 
 
 class MarketChannel:
-    def __init__(self, url: str):
+    def __init__(self, url: str, on_message: Callable[[str], Awaitable[None]]):
         self._url = url
+        self._on_message = on_message
         self._assets: set[str] = set()
         self._subscribed: set[str] = set()
         self._ws: ClientConnection | None = None
@@ -46,5 +47,5 @@ class MarketChannel:
             self._subscribed = set()
             await self._apply()
             async for message in ws:
-                print(message)
+                await self._on_message(message)
             self._ws = None
