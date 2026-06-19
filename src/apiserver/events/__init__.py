@@ -36,4 +36,4 @@ class EventsClient:
             if tradespace is None:
                 raise ValueError("`tradespace` not set when `all_tradespaces=False`")
             prefix += f"/{tradespace}"
-        return self._backend.watch(prefix)
+        return self._backend.watch(prefix + "/")
