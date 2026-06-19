@@ -87,6 +87,16 @@ async def test_update_missing_raises(client):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_apply_creates_then_overwrites(client):
+    await client.apply_record(_record(name="AAPL", labels={"env": "prod"}))
+    assert (await client.get_record(_subject())).metadata.labels == {"env": "prod"}
+    await client.apply_record(_record(name="AAPL", labels={"env": "staging"}))
+    got = await client.get_record(_subject())
+    assert got.metadata.labels == {"env": "staging"}
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_list_by_type_and_tradespace(client):
     await client.create_record(_record(name="AAPL"))
     await client.create_record(_record(name="GOOG"))

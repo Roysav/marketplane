@@ -1,8 +1,5 @@
 from typing import Any
 
-import grpc
-from grpc.aio import AioRpcError
-
 from controller import Controller, RecordNotification
 from controllers.polymarket.api import Event, Market, PolymarketAPI
 from controllers.polymarket.channel import Channel
@@ -12,14 +9,6 @@ TRADESPACE = "polymarket"
 EVENT_TYPE = "alphav1/polymarket/Event"
 MARKET_TYPE = "alphav1/polymarket/Market"
 ASSET_TYPE = "alphav1/polymarket/Asset"
-
-
-async def _ensure(client: MarketplaneClient, record: Record) -> None:
-    try:
-        await client.create_record(record)
-    except AioRpcError as err:
-        if err.code() is not grpc.StatusCode.ALREADY_EXISTS:
-            raise
 
 
 def _market_spec(market: Market) -> dict[str, Any]:
@@ -52,7 +41,7 @@ class EventImporter:
     async def _import(self) -> None:
         for event in await self._api.list_events():
             record = Record(type=EVENT_TYPE, tradespace=TRADESPACE, name=event.event_id, spec=_event_spec(event))
-            await _ensure(self._client, record)
+            await self._client.apply_record(record)
 
 
 class EventReconciler:
@@ -65,7 +54,7 @@ class EventReconciler:
         for market_id in n.record.spec["market_ids"]:
             market = await self._api.get_market(market_id)
             record = Record(type=MARKET_TYPE, tradespace=TRADESPACE, name=market.market_id, spec=_market_spec(market))
-            await _ensure(self._client, record)
+            await self._client.apply_record(record)
 
 
 class MarketReconciler:
@@ -76,7 +65,7 @@ class MarketReconciler:
     async def _reconcile(self, n: RecordNotification) -> None:
         for token_id in n.record.spec["clobTokenIds"]:
             record = Record(type=ASSET_TYPE, tradespace=TRADESPACE, name=token_id, spec={"id": token_id})
-            await _ensure(self._client, record)
+            await self._client.apply_record(record)
 
 
 class AssetSubscriber:

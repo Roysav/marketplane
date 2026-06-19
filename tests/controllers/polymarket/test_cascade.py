@@ -18,7 +18,7 @@ class FakeClient:
     def __init__(self):
         self._records: dict[tuple[str, str, str], Record] = {}
 
-    async def create_record(self, record: Record) -> None:
+    async def apply_record(self, record: Record) -> None:
         self._records[(record.type, record.tradespace, record.name)] = record
 
     async def watch_records(self, type_, tradespace=None, labels=None, *, all_tradespaces=False):

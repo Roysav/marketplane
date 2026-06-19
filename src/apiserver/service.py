@@ -48,6 +48,10 @@ class Service:
         await self._records.update_record(record)
         await self._events.publish("updated", Subject(type=record.type, tradespace=record.tradespace, name=record.metadata.name))
 
+    async def apply_record(self, record: Record) -> None:
+        await self._records.apply_record(record)
+        await self._events.publish("updated", Subject(type=record.type, tradespace=record.tradespace, name=record.metadata.name))
+
     async def get_record(self, subject: Subject) -> Record:
         return await self._records.get_record(subject)
 

@@ -110,6 +110,9 @@ class MarketplaneClient:
     async def update_record(self, record: Record) -> None:
         await self._client.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_record_to_proto(record)))
 
+    async def apply_record(self, record: Record) -> None:
+        await self._client.ApplyRecord(apiserver_pb2.ApplyRecordRequest(record=_record_to_proto(record)))
+
     async def get_record(self, type_: str, tradespace: str, name: str) -> Record:
         resp = await self._client.GetRecord(apiserver_pb2.GetRecordRequest(type=type_, tradespace=tradespace, name=name))
         return _record_from_proto(resp.record)

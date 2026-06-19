@@ -232,6 +232,15 @@ async def test_update_record_wrong_revision_conflicts(stub):
     assert exc_info.value.code() == grpc.StatusCode.ABORTED
 
 
+async def test_apply_record_creates_then_overwrites(stub):
+    await stub.ApplyRecord(apiserver_pb2.ApplyRecordRequest(record=_rec("asset", "nyse", "APPLY", {"v": "1"})))
+    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="APPLY"))
+    assert resp.record.metadata.labels["v"] == "1"
+    await stub.ApplyRecord(apiserver_pb2.ApplyRecordRequest(record=_rec("asset", "nyse", "APPLY", {"v": "2"})))
+    resp = await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="APPLY"))
+    assert resp.record.metadata.labels["v"] == "2"
+
+
 async def test_get_record_not_found(stub):
     with pytest.raises(grpc.aio.AioRpcError) as exc_info:
         await stub.GetRecord(apiserver_pb2.GetRecordRequest(type="asset", tradespace="nyse", name="DOES_NOT_EXIST"))

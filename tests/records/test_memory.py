@@ -57,6 +57,18 @@ async def test_update_replaces_indexes(storage: MemoryRecordStorage) -> None:
 
 
 @pytest.mark.asyncio
+async def test_set_inserts_then_overwrites_and_increments_revision(storage: MemoryRecordStorage) -> None:
+    await storage.set("k1", b"v1", ["env=prod"])
+    assert await storage.get("k1") == b"v1"
+    assert storage._revisions["k1"] == 0
+    await storage.set("k1", b"v2", ["env=staging"])
+    assert await storage.get("k1") == b"v2"
+    assert storage._revisions["k1"] == 1
+    assert await storage.list("", ["env=prod"]) == []
+    assert await storage.list("", ["env=staging"]) == [b"v2"]
+
+
+@pytest.mark.asyncio
 async def test_list_none_indices_no_filter(storage: MemoryRecordStorage) -> None:
     await storage.create("foo/1", b"a", [])
     await storage.create("foo/2", b"b", [])

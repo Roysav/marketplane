@@ -25,6 +25,14 @@ class MemoryRecordStorage:
         for index in indexes:
             self._indexes.setdefault(index, set()).add(key)
 
+    async def set(self, key: str, value: bytes, indexes: list[str]) -> None:
+        for idx_set in self._indexes.values():
+            idx_set.discard(key)
+        self._store[key] = value
+        self._revisions[key] = self._revisions.get(key, -1) + 1
+        for index in indexes:
+            self._indexes.setdefault(index, set()).add(key)
+
     async def get(self, key: str) -> bytes:
         if key not in self._store:
             raise KeyNotFound(key)

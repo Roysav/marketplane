@@ -33,6 +33,14 @@ class PostgresRecordStorage:
             if result is None:
                 raise RevisionMismatch(key)
 
+    async def set(self, key: str, value: bytes, indexes: list[str]) -> None:
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "INSERT INTO records (key, value, indexes, revision) VALUES ($1, $2, $3, 0) "
+                "ON CONFLICT (key) DO UPDATE SET value = excluded.value, indexes = excluded.indexes, revision = records.revision + 1",
+                key, value, indexes,
+            )
+
     async def get(self, key: str) -> bytes:
         async with self._pool.acquire() as conn:
             result = await conn.fetchval("SELECT value FROM records WHERE key = $1", key)

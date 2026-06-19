@@ -11,6 +11,7 @@ from apiserver.types import Subject
 class RecordStorage(Protocol):
     async def create(self, key: str, value: bytes, indexes: list[str]) -> None: ...
     async def update(self, key: str, value: bytes, indexes: list[str], expected_revision: int) -> None: ...
+    async def set(self, key: str, value: bytes, indexes: list[str]) -> None: ...
     async def get(self, key: str) -> bytes: ...
     async def list(self, prefix: str, indices: list[str] | None) -> list[bytes]: ...
 
@@ -66,6 +67,11 @@ class RecordsClient:
             await self._backend.update(key, record.to_bytes(), _labels_to_indices(record.metadata.labels) or [], record.metadata.revision)
         except RevisionMismatch:
             raise RecordRevisionConflict(record.type, record.tradespace, record.metadata.name)
+
+    async def apply_record(self, record: Record) -> None:
+        key = f"{record.type}/{record.tradespace}/{record.metadata.name}"
+        value = record.model_dump_json(exclude={"metadata": {"revision"}}).encode()
+        await self._backend.set(key, value, _labels_to_indices(record.metadata.labels) or [])
 
     async def list_records(self, type_: str, tradespace: str = None, labels: dict[str, str] = None, *, all_tradespaces=False) -> list[Record]:
         prefix = type_

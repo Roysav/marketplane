@@ -124,6 +124,10 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             await context.abort(*e.as_grpc())
         return apiserver_pb2.UpdateRecordResponse()
 
+    async def ApplyRecord(self, request: apiserver_pb2.ApplyRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.ApplyRecordResponse:
+        await self._service.apply_record(_record_from_proto(request.record))
+        return apiserver_pb2.ApplyRecordResponse()
+
     async def GetRecord(self, request: apiserver_pb2.GetRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetRecordResponse:
         try:
             record = await self._service.get_record(Subject(type=request.type, tradespace=request.tradespace, name=request.name))
