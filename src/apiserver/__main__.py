@@ -17,7 +17,7 @@ from apiserver.ticks import TicksClient
 from apiserver.ticks.storage.redis import RedisTickStorage
 from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("apiserver")
 
 
 def main() -> None:

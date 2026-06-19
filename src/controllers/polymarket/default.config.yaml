@@ -8,8 +8,17 @@ logging:
     console:
       class: "logging.StreamHandler"
       formatter: standard
+  loggers:
+    controller:
+      level: "INFO"
+      handlers: [console]
+      propagate: false
+    controllers.polymarket:
+      level: "INFO"
+      handlers: [console]
+      propagate: false
   root:
-    level: "INFO"
+    level: "WARNING"
     handlers: [console]
 
 marketplane:

@@ -8,8 +8,13 @@ logging:
     console:
       class: "logging.StreamHandler"
       formatter: standard
+  loggers:
+    apiserver:
+      level: "INFO"
+      handlers: [console]
+      propagate: false
   root:
-    level: "INFO"
+    level: "WARNING"
     handlers: [console]
 
 server:

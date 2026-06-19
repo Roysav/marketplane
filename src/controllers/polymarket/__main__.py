@@ -13,7 +13,7 @@ from controllers.polymarket.prices import PricePublisher
 from controllers.polymarket.reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
 from sdk import MarketplaneClient
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("controllers.polymarket")
 
 
 async def _run(settings: Settings) -> None:
