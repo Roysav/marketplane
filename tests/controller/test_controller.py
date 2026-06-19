@@ -6,9 +6,10 @@ from controller import Controller, NotificationType
 
 
 class FakeClient:
-    def __init__(self, events=(), ticks=()):
+    def __init__(self, events=(), ticks=(), records=()):
         self._events = list(events)
         self._ticks = list(ticks)
+        self._records = list(records)
 
     async def watch_records(self, type_, tradespace=None, labels=None, *, all_tradespaces=False):
         for event in self._events:
@@ -22,14 +23,21 @@ class FakeClient:
                 yield value
         await asyncio.Event().wait()
 
+    async def list_records(self, type_, tradespace=None, labels=None, *, all_tradespaces=False):
+        return [r for r in self._records if r.type == type_]
+
 
 def _event(action, name, revision=0, labels=None):
     record = Record(type="asset", tradespace="nyse", name=name, labels=labels or {}, revision=revision)
     return RecordEvent(action=action, type="asset", tradespace="nyse", name=name, record=record)
 
 
+def _record(name, labels=None, revision=0):
+    return Record(type="asset", tradespace="nyse", name=name, labels=labels or {}, revision=revision)
+
+
 def _controller(client) -> Controller:
-    return Controller(client, reconnect_backoff=0.01)
+    return Controller(client, reconnect_backoff=0.01, resync_interval=0.05)
 
 
 async def _run_until(ctrl, done, timeout=2.0):
@@ -114,3 +122,53 @@ async def test_dispatches_ticks():
 
     await _run_until(ctrl, done)
     assert seen == [100.0, 101.0]
+
+
+async def test_on_existing_backfills_from_list():
+    client = FakeClient(records=[_record("AAPL"), _record("MSFT")])
+    ctrl = _controller(client)
+    seen: list[tuple[NotificationType, str]] = []
+    done = asyncio.Event()
+
+    @ctrl.on_existing("asset")
+    async def handler(n):
+        seen.append((n.type, n.record.name))
+        if len({name for _, name in seen}) == 2:
+            done.set()
+
+    await _run_until(ctrl, done)
+    assert (NotificationType.RECORD_EXISTING, "AAPL") in seen
+    assert (NotificationType.RECORD_EXISTING, "MSFT") in seen
+
+
+async def test_on_existing_also_handles_live_events():
+    client = FakeClient(events=[_event("created", "AAPL")])
+    ctrl = _controller(client)
+    seen: list[NotificationType] = []
+    done = asyncio.Event()
+
+    @ctrl.on_existing("asset")
+    async def handler(n):
+        if n.type is NotificationType.RECORD_CREATED:
+            seen.append(n.type)
+            done.set()
+
+    await _run_until(ctrl, done)
+    assert NotificationType.RECORD_CREATED in seen
+
+
+async def test_on_existing_resyncs_periodically():
+    client = FakeClient(records=[_record("AAPL")])
+    ctrl = _controller(client)
+    count = 0
+    done = asyncio.Event()
+
+    @ctrl.on_existing("asset")
+    async def handler(n):
+        nonlocal count
+        count += 1
+        if count >= 2:
+            done.set()
+
+    await _run_until(ctrl, done)
+    assert count >= 2

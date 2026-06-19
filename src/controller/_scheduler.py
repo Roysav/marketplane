@@ -4,7 +4,7 @@ from typing import Any
 
 
 class Scheduler:
-    def __init__(self, *, exception_handler: Callable[[BaseException], None]) -> None:
+    def __init__(self, *, exception_handler: Callable[[BaseException], None]):
         self._tasks: set[asyncio.Task[Any]] = set()
         self._exception_handler = exception_handler
 

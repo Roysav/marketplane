@@ -30,7 +30,7 @@ class Selector:
 
 
 class HandlerRegistry:
-    def __init__(self) -> None:
+    def __init__(self):
         self._entries: list[tuple[Selector, Handler]] = []
 
     def register(self, handler: Handler, selector: Selector) -> None:

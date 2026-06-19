@@ -20,7 +20,7 @@ _Item = BaseNotification | _EOS
 
 
 class Multiplexer:
-    def __init__(self, *, scheduler: Scheduler, registry: HandlerRegistry) -> None:
+    def __init__(self, *, scheduler: Scheduler, registry: HandlerRegistry):
         self._scheduler = scheduler
         self._registry = registry
         self._streams: dict[Hashable, asyncio.Queue[_Item]] = {}

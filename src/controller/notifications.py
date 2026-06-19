@@ -10,6 +10,7 @@ class NotificationType(enum.Enum):
     RECORD_CREATED = "RECORD_CREATED"
     RECORD_UPDATED = "RECORD_UPDATED"
     RECORD_DELETED = "RECORD_DELETED"
+    RECORD_EXISTING = "RECORD_EXISTING"
     TICK_CHANGED = "TICK_CHANGED"
 
 
@@ -36,6 +37,10 @@ class RecordNotification(BaseNotification):
     @classmethod
     def from_event(cls, event: RecordEvent) -> "RecordNotification":
         return cls(_ACTION_TYPES[event.action], event.record)
+
+    @classmethod
+    def from_record(cls, record: Record) -> "RecordNotification":
+        return cls(NotificationType.RECORD_EXISTING, record)
 
     @property
     def key(self) -> Hashable:

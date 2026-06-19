@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 from grpc.aio import AioRpcError
-from sdk import MarketplaneClient
+from sdk import MarketplaneClient, Record
 
 from controller._multiplexer import Multiplexer
 from controller._registry import Handler, HandlerRegistry, Selector
@@ -36,11 +36,13 @@ _RECORD_ACTIONS = frozenset({
 
 
 class Controller:
-    def __init__(self, client: MarketplaneClient, *, reconnect_backoff: float) -> None:
+    def __init__(self, client: MarketplaneClient, *, reconnect_backoff: float, resync_interval: float):
         self._client = client
         self._reconnect_backoff = reconnect_backoff
+        self._resync_interval = resync_interval
         self._registry = HandlerRegistry()
         self._record_types: set[str] = set()
+        self._resync_types: set[str] = set()
         self._tick_names: set[str] = set()
 
     def on_record_event(
@@ -61,6 +63,32 @@ class Controller:
         def decorator(handler: Handler) -> Handler:
             self._registry.register(handler, selector)
             self._record_types.add(type_)
+            return handler
+
+        return decorator
+
+    def on_existing(
+        self,
+        type_: str,
+        *,
+        tradespace: str | None = None,
+        labels: dict[str, str] | None = None,
+    ) -> Callable[[Handler], Handler]:
+        selector = Selector(
+            types=frozenset({
+                NotificationType.RECORD_CREATED,
+                NotificationType.RECORD_UPDATED,
+                NotificationType.RECORD_EXISTING,
+            }),
+            record_type=type_,
+            tradespace=tradespace,
+            labels=tuple(sorted((labels or {}).items())),
+        )
+
+        def decorator(handler: Handler) -> Handler:
+            self._registry.register(handler, selector)
+            self._record_types.add(type_)
+            self._resync_types.add(type_)
             return handler
 
         return decorator
@@ -103,6 +131,17 @@ class Controller:
                 name=f"subscribe-tick {name}",
             )
             for name in self._tick_names
+        ] + [
+            asyncio.create_task(
+                self._feed(
+                    functools.partial(self._list_loop, type_),
+                    RecordNotification.from_record,
+                    multiplexer,
+                    f"resync {type_}",
+                ),
+                name=f"resync {type_}",
+            )
+            for type_ in self._resync_types
         ]
         try:
             await asyncio.gather(*feeders)
@@ -127,3 +166,9 @@ class Controller:
                 err.add_note(f"while handling {label!r}")
                 logger.exception(err)
                 await asyncio.sleep(self._reconnect_backoff)
+
+    async def _list_loop(self, type_: str) -> AsyncIterator[Record]:
+        while True:
+            for record in await self._client.list_records(type_, all_tradespaces=True):
+                yield record
+            await asyncio.sleep(self._resync_interval)
