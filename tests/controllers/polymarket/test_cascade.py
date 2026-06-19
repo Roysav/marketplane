@@ -13,33 +13,6 @@ from controllers.polymarket.reconcilers import (
     EventReconciler,
     MarketReconciler,
 )
-from sdk import Record
-
-
-class FakeClient:
-    def __init__(self):
-        self._records: dict[tuple[str, str, str], Record] = {}
-
-    async def apply_record(self, record: Record) -> None:
-        self._records[(record.type, record.tradespace, record.name)] = record
-
-    async def watch_records(self, type_, tradespace=None, labels=None, *, all_tradespaces=False):
-        if False:
-            yield
-        await asyncio.Event().wait()
-
-    async def subscribe_tick(self, name):
-        if False:
-            yield
-        await asyncio.Event().wait()
-
-    async def list_records(self, type_, tradespace=None, labels=None, *, all_tradespaces=False):
-        return [r for r in self._records.values() if r.type == type_]
-
-    def of_type(self, type_: str) -> list[Record]:
-        return [r for r in self._records.values() if r.type == type_]
-
-
 class FakeAPI:
     def __init__(self, events, markets):
         self._events = events
@@ -63,8 +36,7 @@ def _fixtures():
     return event, market
 
 
-async def test_cron_imports_events_then_cascades_to_asset_subscription():
-    client = FakeClient()
+async def test_cron_imports_events_then_cascades_to_asset_subscription(client):
     channel = FakeChannel()
     controller = Controller(client, reconnect_backoff=0.01, resync_interval=0.03)
     event, market = _fixtures()
@@ -97,8 +69,7 @@ class BoomAPI:
         raise httpx.ConnectError("boom")
 
 
-async def test_import_logs_and_continues_on_api_error():
-    client = FakeClient()
+async def test_import_logs_and_continues_on_api_error(client):
     controller = Controller(client, reconnect_backoff=0.01, resync_interval=10.0)
     importer = EventImporter(controller, client, BoomAPI(), interval=10.0)
     await importer._import()

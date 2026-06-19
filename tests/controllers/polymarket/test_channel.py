@@ -15,14 +15,18 @@ async def _noop(message: str) -> None:
     pass
 
 
+def _channel(max_assets: int) -> MarketChannel:
+    return MarketChannel("ws://test", _noop, max_assets=max_assets, ping_timeout=1.0)
+
+
 async def test_update_caps_to_max_assets():
-    channel = MarketChannel("ws://x", _noop, max_assets=2)
+    channel = _channel(2)
     await channel.update({"c", "a", "b"})
     assert channel._assets == {"a", "b"}
 
 
 async def test_apply_sends_initial_subscribe_then_deltas():
-    channel = MarketChannel("ws://x", _noop, max_assets=100)
+    channel = _channel(100)
     ws = FakeWS()
     channel._ws = ws
 

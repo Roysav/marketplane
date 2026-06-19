@@ -3,16 +3,7 @@ import json
 from controllers.polymarket.prices import PricePublisher
 
 
-class FakeClient:
-    def __init__(self):
-        self.ticks = []
-
-    async def publish_tick(self, name, value):
-        self.ticks.append((name, value))
-
-
-async def test_publishes_each_price_change_entry_as_tick():
-    client = FakeClient()
+async def test_publishes_each_price_change_entry_as_tick(client):
     event = {
         "event_type": "price_change",
         "market": "0xabc",
@@ -28,16 +19,14 @@ async def test_publishes_each_price_change_entry_as_tick():
     ]
 
 
-async def test_ignores_non_price_change_messages():
-    client = FakeClient()
+async def test_ignores_non_price_change_messages(client):
     publisher = PricePublisher(client)
     await publisher.on_message(json.dumps({"event_type": "last_trade_price", "asset_id": "tokA", "price": "0.5"}))
     await publisher.on_message(json.dumps([]))
     assert client.ticks == []
 
 
-async def test_handles_array_payload():
-    client = FakeClient()
+async def test_handles_array_payload(client):
     event = {"event_type": "price_change", "price_changes": [{"asset_id": "tokC", "price": "0.9"}]}
     await PricePublisher(client).on_message(json.dumps([event]))
     assert client.ticks == [("alphav1/polymarket/AssetPrice/tokC", {"asset_id": "tokC", "price": "0.9"})]
