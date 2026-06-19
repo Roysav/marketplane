@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import AsyncIterator
 
-from apiserver.events import Event
+from .. import Event
 
 
 class MemoryEventStorage:

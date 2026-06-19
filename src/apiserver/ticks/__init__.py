@@ -2,8 +2,8 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, Protocol
 
-from apiserver.errors import TickNotFound
-from apiserver.ticks.storage.exceptions import KeyNotFound
+from ..errors import TickNotFound
+from .storage.exceptions import KeyNotFound
 
 
 class TickStorage(Protocol):

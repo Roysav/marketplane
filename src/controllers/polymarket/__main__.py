@@ -5,10 +5,10 @@ import httpx
 from marketplane.apiserver.v1 import apiserver_pb2_grpc
 
 from controller import Controller
-from controllers.polymarket.api import PolymarketAPI
-from controllers.polymarket.channel import MarketChannel
-from controllers.polymarket.config import Settings
-from controllers.polymarket.reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
+from .api import PolymarketAPI
+from .channel import MarketChannel
+from .config import Settings
+from .reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
 from sdk import MarketplaneClient
 
 

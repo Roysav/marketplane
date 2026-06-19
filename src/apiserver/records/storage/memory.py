@@ -1,4 +1,4 @@
-from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
+from .exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
 
 
 class MemoryRecordStorage:

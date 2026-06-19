@@ -3,9 +3,9 @@ from typing import Any, Protocol
 
 import pydantic
 
-from apiserver.errors import RecordAlreadyExists, RecordNotFound, RecordRevisionConflict
-from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
-from apiserver.types import Subject
+from ..errors import RecordAlreadyExists, RecordNotFound, RecordRevisionConflict
+from .storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
+from ..types import Subject
 
 
 class RecordStorage(Protocol):

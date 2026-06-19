@@ -2,7 +2,7 @@ from pathlib import Path
 
 import asyncpg
 
-from apiserver.records.storage.exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
+from .exceptions import KeyAlreadyExists, KeyNotFound, RevisionMismatch
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 

@@ -7,10 +7,10 @@ from typing import Any
 from grpc.aio import AioRpcError
 from sdk import MarketplaneClient, Record
 
-from controller._multiplexer import Multiplexer
-from controller._registry import Handler, HandlerRegistry, Selector
-from controller._scheduler import Scheduler
-from controller.notifications import (
+from ._multiplexer import Multiplexer
+from ._registry import Handler, HandlerRegistry, Selector
+from ._scheduler import Scheduler
+from .notifications import (
     BaseNotification,
     NotificationType,
     RecordNotification,

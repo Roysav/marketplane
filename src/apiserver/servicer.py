@@ -8,10 +8,10 @@ from google.protobuf.struct_pb2 import Struct, Value
 from google.type import decimal_pb2
 from marketplane.apiserver.v1 import apiserver_pb2, apiserver_pb2_grpc
 
-from apiserver.errors import ServiceError
-from apiserver.records import Record, RecordMetadata
-from apiserver.service import Service
-from apiserver.types import Subject
+from .errors import ServiceError
+from .records import Record, RecordMetadata
+from .service import Service
+from .types import Subject
 
 
 def _record_from_proto(r: apiserver_pb2.Record) -> Record:

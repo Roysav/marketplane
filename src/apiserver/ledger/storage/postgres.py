@@ -3,7 +3,7 @@ from pathlib import Path
 
 import asyncpg
 
-from apiserver.ledger.storage.exceptions import InsufficientBalanceError
+from .exceptions import InsufficientBalanceError
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 

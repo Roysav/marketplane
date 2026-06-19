@@ -1,8 +1,8 @@
 from typing import Any
 
 from controller import Controller, RecordNotification
-from controllers.polymarket.api import Event, Market, PolymarketAPI
-from controllers.polymarket.channel import Channel
+from .api import Event, Market, PolymarketAPI
+from .channel import Channel
 from sdk import MarketplaneClient, Record
 
 TRADESPACE = "polymarket"

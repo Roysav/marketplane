@@ -2,8 +2,8 @@ import grpc
 from grpc_reflection.v1alpha import reflection
 from marketplane.apiserver.v1 import apiserver_pb2, apiserver_pb2_grpc
 
-from apiserver.service import Service
-from apiserver.servicer import ApiserverServicer
+from .service import Service
+from .servicer import ApiserverServicer
 
 _PORT = 50051
 

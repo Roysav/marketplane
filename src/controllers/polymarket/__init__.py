@@ -1,7 +1,7 @@
-from controllers.polymarket.api import Event, Market, PolymarketAPI
-from controllers.polymarket.channel import Channel, MarketChannel
-from controllers.polymarket.config import Settings
-from controllers.polymarket.reconcilers import (
+from .api import Event, Market, PolymarketAPI
+from .channel import Channel, MarketChannel
+from .config import Settings
+from .reconcilers import (
     ASSET_TYPE,
     EVENT_TYPE,
     MARKET_TYPE,

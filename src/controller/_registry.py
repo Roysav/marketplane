@@ -1,7 +1,7 @@
 import dataclasses
 from collections.abc import Awaitable, Callable, Iterator
 
-from controller.notifications import BaseNotification, NotificationType, RecordNotification, TickNotification
+from .notifications import BaseNotification, NotificationType, RecordNotification, TickNotification
 
 Handler = Callable[[BaseNotification], Awaitable[None]]
 

@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 
 import redis.asyncio as redis
 
-from apiserver.events import Event
+from .. import Event
 
 
 class RedisEventStorage:

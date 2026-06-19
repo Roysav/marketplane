@@ -3,9 +3,9 @@ import enum
 import logging
 from collections.abc import Hashable
 
-from controller._registry import HandlerRegistry
-from controller._scheduler import Scheduler
-from controller.notifications import BaseNotification
+from ._registry import HandlerRegistry
+from ._scheduler import Scheduler
+from .notifications import BaseNotification
 
 logger = logging.getLogger(__name__)
 

@@ -2,7 +2,7 @@ import asyncio
 from collections import defaultdict
 from collections.abc import AsyncIterator
 
-from apiserver.ticks.storage.exceptions import KeyNotFound
+from .exceptions import KeyNotFound
 
 
 class MemoryTickStorage:

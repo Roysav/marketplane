@@ -1,8 +1,8 @@
 import asyncio
 from decimal import Decimal
 
-from apiserver.ledger import LedgerEntry
-from apiserver.ledger.storage.exceptions import InsufficientBalanceError
+from .. import LedgerEntry
+from .exceptions import InsufficientBalanceError
 
 
 class MemoryLedgerStorage:

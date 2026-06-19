@@ -2,7 +2,7 @@ from collections.abc import AsyncIterator
 
 import redis.asyncio as redis
 
-from apiserver.ticks.storage.exceptions import KeyNotFound
+from .exceptions import KeyNotFound
 
 
 class RedisTickStorage:

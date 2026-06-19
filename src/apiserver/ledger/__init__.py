@@ -3,8 +3,8 @@ from typing import Protocol
 
 import pydantic
 
-from apiserver.errors import InsufficientBalance
-from apiserver.ledger.storage.exceptions import InsufficientBalanceError
+from ..errors import InsufficientBalance
+from .storage.exceptions import InsufficientBalanceError
 
 
 class LedgerEntry(pydantic.BaseModel):

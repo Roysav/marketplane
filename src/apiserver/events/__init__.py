@@ -3,7 +3,7 @@ from typing import Literal, Protocol
 
 import pydantic
 
-from apiserver.types import Subject
+from ..types import Subject
 
 
 class Event(pydantic.BaseModel):
