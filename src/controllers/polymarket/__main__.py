@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import logging.config
 
 import grpc.aio
 import httpx
@@ -9,17 +9,22 @@ from controller import Controller
 from controllers.polymarket.api import PolymarketAPI
 from controllers.polymarket.channel import MarketChannel
 from controllers.polymarket.config import Settings
+from controllers.polymarket.prices import PricePublisher
 from controllers.polymarket.reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
-from controllers.polymarket.trades import TradePublisher
 from sdk import MarketplaneClient
 
 logger = logging.getLogger(__name__)
+
+_MAX_MESSAGE_BYTES = 256 * 1024 * 1024
 
 
 async def _run(settings: Settings) -> None:
     logger.info("polymarket controller starting")
     async with (
-        grpc.aio.insecure_channel(settings.marketplane.address) as grpc_channel,
+        grpc.aio.insecure_channel(settings.marketplane.address, options=[
+            ("grpc.max_send_message_length", _MAX_MESSAGE_BYTES),
+            ("grpc.max_receive_message_length", _MAX_MESSAGE_BYTES),
+        ]) as grpc_channel,
         httpx.AsyncClient(base_url=settings.polymarket.gamma_api_url, headers={"User-Agent": "marketplane-polymarket/0"}) as http_client,
     ):
         client = MarketplaneClient(apiserver_pb2_grpc.ApiserverServiceStub(grpc_channel))
@@ -28,7 +33,7 @@ async def _run(settings: Settings) -> None:
             reconnect_backoff=settings.controller.reconnect_backoff,
             resync_interval=settings.controller.resync_interval,
         )
-        channel = MarketChannel(settings.polymarket.market_channel_url, TradePublisher(client).on_message, max_assets=settings.polymarket.max_assets)
+        channel = MarketChannel(settings.polymarket.market_channel_url, PricePublisher(client).on_message, max_assets=settings.polymarket.max_assets)
         api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size, max_concurrency=settings.polymarket.max_concurrency)
 
         AssetSubscriber(controller, channel)
@@ -40,8 +45,9 @@ async def _run(settings: Settings) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    asyncio.run(_run(Settings()))
+    settings = Settings()
+    logging.config.dictConfig(settings.logging)
+    asyncio.run(_run(settings))
 
 
 if __name__ == "__main__":

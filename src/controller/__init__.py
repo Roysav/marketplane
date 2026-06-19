@@ -180,9 +180,9 @@ class Controller:
 
     async def _list_loop(self, type_: str) -> AsyncIterator[Record]:
         while True:
+            await asyncio.sleep(self._resync_interval)
             for record in await self._client.list_records(type_, all_tradespaces=True):
                 yield record
-            await asyncio.sleep(self._resync_interval)
 
     async def _schedule_loop(self, interval: float, handler: Callable[[], Awaitable[None]]) -> None:
         while True:
