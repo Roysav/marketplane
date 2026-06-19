@@ -28,8 +28,8 @@ class LedgerClient:
     async def allocate(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
         try:
             await self._backend.allocate(from_principal, to_principal, currency, amount, subject)
-        except InsufficientBalanceError:
-            raise InsufficientBalance(from_principal, currency, amount)
+        except InsufficientBalanceError as err:
+            raise InsufficientBalance(from_principal, currency, amount) from err
 
     async def grant(self, from_principal: str, to_principal: str, currency: str, amount: Decimal, subject: str) -> None:
         await self._backend.grant(from_principal, to_principal, currency, amount, subject)

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import asyncpg
 
-from .exceptions import InsufficientBalanceError
+from ..exceptions import InsufficientBalanceError
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -48,8 +48,8 @@ class PostgresLedgerStorage:
 
     async def balance(self, principal: str, currency: str) -> Decimal:
         async with self._pool.acquire() as conn:
-            return Decimal(str(await conn.fetchval("""
+            return await conn.fetchval("""
                 SELECT COALESCE(SUM(CASE WHEN to_principal = $1 THEN amount ELSE -amount END), 0::NUMERIC)
                 FROM ledger_entries
                 WHERE (from_principal = $1 OR to_principal = $1) AND currency = $2
-            """, principal, currency)))
+            """, principal, currency)
