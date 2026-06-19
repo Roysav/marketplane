@@ -3,10 +3,10 @@ from typing import Any
 
 from sdk import MarketplaneClient
 
-LAST_TRADE_TICK = "alphav1/polymarket/AssetLastTrade"
+ASSET_PRICE_TICK = "alphav1/polymarket/AssetPrice"
 
 
-class TradePublisher:
+class PricePublisher:
     def __init__(self, client: MarketplaneClient):
         self._client = client
 
@@ -14,5 +14,6 @@ class TradePublisher:
         payload = json.loads(message)
         events: list[Any] = payload if isinstance(payload, list) else [payload]
         for event in events:
-            if event.get("event_type") == "last_trade_price":
-                await self._client.publish_tick(f"{LAST_TRADE_TICK}/{event['asset_id']}", event)
+            if event.get("event_type") == "price_change":
+                for change in event["price_changes"]:
+                    await self._client.publish_tick(f"{ASSET_PRICE_TICK}/{change['asset_id']}", change)

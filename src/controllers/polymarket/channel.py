@@ -37,7 +37,10 @@ class MarketChannel:
             return
         self._assets = new
         if self._ws is not None:
-            await self._apply()
+            try:
+                await self._apply()
+            except ConnectionClosed:
+                pass
 
     async def _apply(self) -> None:
         assert self._ws is not None
@@ -61,7 +64,10 @@ class MarketChannel:
             try:
                 await self._apply()
                 async for message in ws:
-                    await self._on_message(message)
+                    try:
+                        await self._on_message(message)
+                    except Exception:
+                        logger.exception("market channel message handler failed")
             except ConnectionClosed:
                 logger.warning("market channel disconnected; reconnecting")
             self._ws = None
