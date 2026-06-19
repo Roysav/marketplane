@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from apiserver.config import Settings
 
 _VALID = {
+    "logging": {"version": 1, "root": {"level": "INFO"}},
     "ledger":  {"storage": {"backend": "postgres", "postgres": {"connectionUri": "postgresql://localhost/ledger"}}},
     "records": {"storage": {"backend": "postgres", "postgres": {"connectionUri": "postgresql://localhost/records"}}},
     "events":  {"storage": {"backend": "redis",    "redis":    {"connectionUri": "redis://localhost/0"}}},
@@ -49,7 +50,7 @@ def test_yaml_missing_file_raises(monkeypatch):
     with pytest.raises(ValidationError) as exc:
         Settings()
     locs = {e["loc"][0] for e in exc.value.errors()}
-    assert locs == {"ledger", "records", "events", "ticks"}
+    assert locs == {"logging", "ledger", "records", "events", "ticks"}
 
 
 def test_yaml_missing_field_raises(tmp_path, monkeypatch):
@@ -97,6 +98,7 @@ def test_yaml_does_not_override_env(cfg, monkeypatch):
 
 def test_env_supplies_all_fields(tmp_path, monkeypatch):
     monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
+    monkeypatch.setenv("MARKETPLANE_LOGGING", '{"version": 1}')
     monkeypatch.setenv("MARKETPLANE_LEDGER__STORAGE__BACKEND", "postgres")
     monkeypatch.setenv("MARKETPLANE_LEDGER__STORAGE__POSTGRES__CONNECTIONURI", "postgresql://env/ledger")
     monkeypatch.setenv("MARKETPLANE_RECORDS__STORAGE__BACKEND", "postgres")
@@ -140,6 +142,7 @@ def test_cli_unknown_flags_ignored(cfg, monkeypatch):
 
 def test_cli_supplies_all_fields(tmp_path, monkeypatch):
     monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
+    monkeypatch.setenv("MARKETPLANE_LOGGING", '{"version": 1}')
     monkeypatch.setattr(sys, "argv", [
         "prog",
         "--ledger.storage.backend", "postgres",

@@ -1,4 +1,5 @@
 import asyncio
+import logging.config
 
 import asyncpg
 import redis.asyncio as redis
@@ -16,14 +17,17 @@ from apiserver.ticks import TicksClient
 from apiserver.ticks.storage.redis import RedisTickStorage
 from apiserver.utils.migrations.postgres import PostgresMigrationClient
 
-
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
-    asyncio.run(_run(Settings()))
+    settings = Settings()
+    logging.config.dictConfig(settings.logging)
+    asyncio.run(_run(settings))
 
 
 async def _run(settings: Settings) -> None:
+    logger.info("apiserver starting")
     ledger_pool = await asyncpg.create_pool(settings.ledger.storage.postgres.connection_uri)
     async with ledger_pool.acquire() as conn:
         await PostgresMigrationClient(conn, ledger_migrations(), "ledger_schema_migrations").apply()

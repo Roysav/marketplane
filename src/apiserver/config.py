@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, CliSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict, YamlConfigSettingsSource
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
     )
 
+    logging: dict[str, Any]
     ledger: LedgerSettings
     records: RecordsSettings
     events: EventsSettings

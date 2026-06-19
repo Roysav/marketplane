@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, CliSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict, YamlConfigSettingsSource
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
         env_nested_delimiter="__",
     )
 
+    logging: dict[str, Any]
     marketplane: MarketplaneConfig
     controller: ControllerConfig
     polymarket: PolymarketConfig
