@@ -36,7 +36,7 @@ def isolate(monkeypatch):
 # --- yaml ---
 
 def test_yaml_loads_all_fields(cfg, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(cfg))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(cfg))
     s = Settings()
     assert s.ledger.storage.postgres.connection_uri == "postgresql://localhost/ledger"
     assert s.records.storage.postgres.connection_uri == "postgresql://localhost/records"
@@ -45,7 +45,7 @@ def test_yaml_loads_all_fields(cfg, monkeypatch):
 
 
 def test_yaml_missing_file_raises(monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", "nonexistent.yaml")
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", "nonexistent.yaml")
     with pytest.raises(ValidationError) as exc:
         Settings()
     locs = {e["loc"][0] for e in exc.value.errors()}
@@ -58,7 +58,7 @@ def test_yaml_missing_field_raises(tmp_path, monkeypatch):
     del cfg["ticks"]
     f = tmp_path / "config.yaml"
     f.write_text(yaml.dump(cfg))
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(f))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(f))
     with pytest.raises(ValidationError) as exc:
         Settings()
     locs = [e["loc"][0] for e in exc.value.errors()]
@@ -71,7 +71,7 @@ def test_yaml_bad_discriminator_raises(tmp_path, monkeypatch):
     cfg["ledger"]["storage"]["backend"] = "mysql"
     f = tmp_path / "config.yaml"
     f.write_text(yaml.dump(cfg))
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(f))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(f))
     with pytest.raises(ValidationError) as exc:
         Settings()
     locs = [e["loc"] for e in exc.value.errors()]
@@ -81,7 +81,7 @@ def test_yaml_bad_discriminator_raises(tmp_path, monkeypatch):
 # --- env ---
 
 def test_env_overrides_yaml(cfg, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(cfg))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(cfg))
     monkeypatch.setenv("MARKETPLANE_TICKS__STORAGE__REDIS__CONNECTIONURI", "redis://override:6379/9")
     s = Settings()
     assert s.ticks.storage.redis.connection_uri == "redis://override:6379/9"
@@ -89,14 +89,14 @@ def test_env_overrides_yaml(cfg, monkeypatch):
 
 
 def test_yaml_does_not_override_env(cfg, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(cfg))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(cfg))
     monkeypatch.setenv("MARKETPLANE_TICKS__STORAGE__REDIS__CONNECTIONURI", "redis://env:6379/9")
     s = Settings()
     assert s.ticks.storage.redis.connection_uri == "redis://env:6379/9"
 
 
 def test_env_supplies_all_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
     monkeypatch.setenv("MARKETPLANE_LEDGER__STORAGE__BACKEND", "postgres")
     monkeypatch.setenv("MARKETPLANE_LEDGER__STORAGE__POSTGRES__CONNECTIONURI", "postgresql://env/ledger")
     monkeypatch.setenv("MARKETPLANE_RECORDS__STORAGE__BACKEND", "postgres")
@@ -110,15 +110,18 @@ def test_env_supplies_all_fields(tmp_path, monkeypatch):
     assert s.ticks.storage.redis.connection_uri == "redis://env/1"
 
 
-def test_missing_config_file_env_var_raises(monkeypatch):
-    with pytest.raises(ValueError, match="MARKETPLANE_CONFIG_FILE"):
-        Settings()
+def test_defaults_to_packaged_config(monkeypatch):
+    s = Settings()
+    assert s.ledger.storage.backend == "postgres"
+    assert s.records.storage.backend == "postgres"
+    assert s.events.storage.redis.connection_uri.startswith("redis://")
+    assert s.ticks.storage.redis.connection_uri.startswith("redis://")
 
 
 # --- cli ---
 
 def test_cli_overrides_yaml_and_env(cfg, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(cfg))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(cfg))
     monkeypatch.setenv("MARKETPLANE_TICKS__STORAGE__REDIS__CONNECTIONURI", "redis://env:6379/9")
     monkeypatch.setattr(sys, "argv", [
         "prog",
@@ -129,14 +132,14 @@ def test_cli_overrides_yaml_and_env(cfg, monkeypatch):
 
 
 def test_cli_unknown_flags_ignored(cfg, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(cfg))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(cfg))
     monkeypatch.setattr(sys, "argv", ["prog", "--workers", "4", "--host", "0.0.0.0"])
     s = Settings()
     assert s.ticks.storage.redis.connection_uri == "redis://localhost/1"
 
 
 def test_cli_supplies_all_fields(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
+    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(tmp_path / "nonexistent.yaml"))
     monkeypatch.setattr(sys, "argv", [
         "prog",
         "--ledger.storage.backend", "postgres",

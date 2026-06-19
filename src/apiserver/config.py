@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -59,9 +60,7 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        yaml_file = os.environ.get("MARKETPLANE_CONFIG_FILE")
-        if yaml_file is None:
-            raise ValueError("MARKETPLANE_CONFIG_FILE is not set")
+        yaml_file = os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", str(Path(__file__).parent / "config.yaml"))
         return (
             CliSettingsSource(settings_cls, cli_parse_args=True, cli_ignore_unknown_args=True),
             env_settings,
