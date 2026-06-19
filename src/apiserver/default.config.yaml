@@ -13,9 +13,6 @@ logging:
       level: "INFO"
       handlers: [console]
       propagate: false
-  root:
-    level: "WARNING"
-    handlers: [console]
 
 server:
   maxMessageBytes: 268435456

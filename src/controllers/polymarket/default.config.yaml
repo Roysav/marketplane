@@ -17,9 +17,6 @@ logging:
       level: "INFO"
       handlers: [console]
       propagate: false
-  root:
-    level: "WARNING"
-    handlers: [console]
 
 marketplane:
   maxMessageBytes: 268435456
