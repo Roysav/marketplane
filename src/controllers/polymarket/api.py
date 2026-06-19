@@ -58,6 +58,8 @@ class PolymarketAPI:
                 "/events",
                 params={"limit": self._page_size, "offset": offset, "closed": "false"},
             )
+            if offset > 0 and response.status_code == 422:
+                return events
             response.raise_for_status()
             page = response.json()
             events.extend(_event(raw) for raw in page)

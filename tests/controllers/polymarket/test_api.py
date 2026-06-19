@@ -1,4 +1,21 @@
-from controllers.polymarket.api import _event, _market
+import httpx
+
+from controllers.polymarket.api import PolymarketAPI, _event, _market
+
+
+async def test_list_events_paginates_and_stops_at_offset_cap():
+    def handler(request: httpx.Request) -> httpx.Response:
+        offset = int(request.url.params["offset"])
+        if offset >= 200:
+            return httpx.Response(422)
+        return httpx.Response(200, json=[{"id": f"e{offset + i}", "slug": "s", "title": "t", "markets": []} for i in range(100)])
+
+    async with httpx.AsyncClient(base_url="http://test", transport=httpx.MockTransport(handler)) as client:
+        events = await PolymarketAPI(client, page_size=100).list_events()
+
+    assert len(events) == 200
+    assert events[0].event_id == "e0"
+    assert events[-1].event_id == "e199"
 
 
 def test_event_carries_only_tradeable_market_ids():
