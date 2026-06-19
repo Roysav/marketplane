@@ -1,0 +1,12 @@
+marketplane:
+  address: "localhost:50051"
+
+controller:
+  reconnectBackoff: 1.0
+  resyncInterval: 30.0
+
+polymarket:
+  marketChannelUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+  gammaApiUrl: "https://gamma-api.polymarket.com"
+  cronInterval: 60.0
+  pageSize: 100
