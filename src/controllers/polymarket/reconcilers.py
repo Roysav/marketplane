@@ -39,7 +39,7 @@ def _event_spec(event: Event) -> dict[str, Any]:
         "id": event.event_id,
         "slug": event.slug,
         "title": event.title,
-        "markets": [_market_spec(market) for market in event.markets],
+        "market_ids": event.market_ids,
     }
 
 
@@ -56,13 +56,15 @@ class EventImporter:
 
 
 class EventReconciler:
-    def __init__(self, controller: Controller, client: MarketplaneClient):
+    def __init__(self, controller: Controller, client: MarketplaneClient, api: PolymarketAPI):
         self._client = client
+        self._api = api
         controller.on_existing(EVENT_TYPE, tradespace=TRADESPACE)(self._reconcile)
 
     async def _reconcile(self, n: RecordNotification) -> None:
-        for market in n.record.spec["markets"]:
-            record = Record(type=MARKET_TYPE, tradespace=TRADESPACE, name=market["market_id"], spec=market)
+        for market_id in n.record.spec["market_ids"]:
+            market = await self._api.get_market(market_id)
+            record = Record(type=MARKET_TYPE, tradespace=TRADESPACE, name=market.market_id, spec=_market_spec(market))
             await _ensure(self._client, record)
 
 

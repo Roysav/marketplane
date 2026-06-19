@@ -21,7 +21,7 @@ class Event:
     event_id: str
     slug: str
     title: str
-    markets: list[Market]
+    market_ids: list[str]
 
 
 def _market(raw: dict[str, Any]) -> Market:
@@ -41,7 +41,7 @@ def _event(raw: dict[str, Any]) -> Event:
         event_id=raw["id"],
         slug=raw["slug"],
         title=raw["title"],
-        markets=[_market(m) for m in raw["markets"] if "clobTokenIds" in m],
+        market_ids=[market["id"] for market in raw["markets"] if "clobTokenIds" in market],
     )
 
 
@@ -64,3 +64,8 @@ class PolymarketAPI:
             if len(page) < self._page_size:
                 return events
             offset += self._page_size
+
+    async def get_market(self, market_id: str) -> Market:
+        response = await self._client.get(f"/markets/{market_id}")
+        response.raise_for_status()
+        return _market(response.json())

@@ -39,8 +39,11 @@ class FakeClient:
 
 
 class FakeAPI:
-    def __init__(self, events): self._events = events
+    def __init__(self, events, markets):
+        self._events = events
+        self._markets = {m.market_id: m for m in markets}
     async def list_events(self): return self._events
+    async def get_market(self, market_id): return self._markets[market_id]
 
 
 class FakeChannel:
@@ -49,23 +52,26 @@ class FakeChannel:
     async def run(self): await asyncio.Event().wait()
 
 
-def _event():
+def _fixtures():
     market = Market(
         market_id="m1", question="q", slug="s", condition_id="0xabc",
         outcomes=["Yes", "No"], clob_token_ids=["tokA", "tokB"], active=True,
     )
-    return Event(event_id="e1", slug="es", title="et", markets=[market])
+    event = Event(event_id="e1", slug="es", title="et", market_ids=["m1"])
+    return event, market
 
 
 async def test_cron_imports_events_then_cascades_to_asset_subscription():
     client = FakeClient()
     channel = FakeChannel()
     controller = Controller(client, reconnect_backoff=0.01, resync_interval=0.03)
+    event, market = _fixtures()
+    api = FakeAPI([event], [market])
 
     AssetSubscriber(controller, channel)
     MarketReconciler(controller, client)
-    EventReconciler(controller, client)
-    EventImporter(controller, client, FakeAPI([_event()]), interval=10.0)
+    EventReconciler(controller, client, api)
+    EventImporter(controller, client, api, interval=10.0)
 
     task = asyncio.create_task(controller.run())
     for _ in range(100):

@@ -28,7 +28,7 @@ async def _run(settings: Settings) -> None:
 
         AssetSubscriber(controller, channel)
         MarketReconciler(controller, client)
-        EventReconciler(controller, client)
+        EventReconciler(controller, client, api)
         EventImporter(controller, client, api, interval=settings.polymarket.cron_interval)
 
         await asyncio.gather(channel.run(), controller.run())
