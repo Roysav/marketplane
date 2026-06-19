@@ -3,6 +3,7 @@ from decimal import Decimal
 from typing import Any
 
 import grpc
+import pydantic
 from google.protobuf import json_format
 from google.protobuf.struct_pb2 import Struct, Value
 from google.type import decimal_pb2
@@ -115,6 +116,8 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             await self._service.create_record(_record_from_proto(request.record))
         except ServiceError as e:
             await context.abort(*e.as_grpc())
+        except pydantic.ValidationError as e:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
         return apiserver_pb2.CreateRecordResponse()
 
     async def UpdateRecord(self, request: apiserver_pb2.UpdateRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.UpdateRecordResponse:
@@ -122,10 +125,15 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             await self._service.update_record(_record_from_proto(request.record))
         except ServiceError as e:
             await context.abort(*e.as_grpc())
+        except pydantic.ValidationError as e:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
         return apiserver_pb2.UpdateRecordResponse()
 
     async def ApplyRecord(self, request: apiserver_pb2.ApplyRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.ApplyRecordResponse:
-        await self._service.apply_record(_record_from_proto(request.record))
+        try:
+            await self._service.apply_record(_record_from_proto(request.record))
+        except pydantic.ValidationError as e:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
         return apiserver_pb2.ApplyRecordResponse()
 
     async def GetRecord(self, request: apiserver_pb2.GetRecordRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.GetRecordResponse:
@@ -133,6 +141,8 @@ class ApiserverServicer(apiserver_pb2_grpc.ApiserverServiceServicer):
             record = await self._service.get_record(Subject(type=request.type, tradespace=request.tradespace, name=request.name))
         except ServiceError as e:
             await context.abort(*e.as_grpc())
+        except pydantic.ValidationError as e:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
         return apiserver_pb2.GetRecordResponse(record=_record_to_proto(record))
 
     async def ListRecords(self, request: apiserver_pb2.ListRecordsRequest, context: grpc.aio.ServicerContext) -> apiserver_pb2.ListRecordsResponse:

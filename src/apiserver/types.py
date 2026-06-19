@@ -2,9 +2,9 @@ import pydantic
 
 
 class Subject(pydantic.BaseModel):
-    type: str
-    tradespace: str
-    name: str
+    type: str = pydantic.Field(min_length=1)
+    tradespace: str = pydantic.Field(min_length=1)
+    name: str = pydantic.Field(min_length=1)
 
     def key(self) -> str:
         return f"{self.type}/{self.tradespace}/{self.name}"

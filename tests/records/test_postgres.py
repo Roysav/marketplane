@@ -160,7 +160,7 @@ async def test_list_no_labels_returns_all(client):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-async def test_update_labels_replaces_old_indexes(client):
+async def test_update_labels_replaces_old_indices(client):
     await client.create_record(_record(name="AAPL", labels={"env": "prod"}))
     await client.update_record(_record(name="AAPL", labels={"env": "staging"}, revision=1))
 

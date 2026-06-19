@@ -1,41 +1,43 @@
+from decimal import Decimal
+
 import grpc
+
+from .types import Subject
 
 
 class ServiceError(Exception):
     grpc_code: grpc.StatusCode
 
+    def __init__(self, **data: object) -> None:
+        self.data = data
+        super().__init__(data)
+
     def as_grpc(self) -> tuple[grpc.StatusCode, str]:
-        return self.grpc_code, str(self)
+        return self.grpc_code, str(self.data)
 
 
 class RecordNotFound(ServiceError):
     grpc_code = grpc.StatusCode.NOT_FOUND
 
-    def __init__(self, type_: str, tradespace: str, name: str) -> None:
-        self.type = type_
-        self.tradespace = tradespace
-        self.name = name
-        super().__init__(f"record {type_}/{tradespace}/{name} not found")
+    def __init__(self, subject: Subject) -> None:
+        self.subject = subject
+        super().__init__(subject=subject.key())
 
 
 class RecordAlreadyExists(ServiceError):
     grpc_code = grpc.StatusCode.ALREADY_EXISTS
 
-    def __init__(self, type_: str, tradespace: str, name: str) -> None:
-        self.type = type_
-        self.tradespace = tradespace
-        self.name = name
-        super().__init__(f"record {type_}/{tradespace}/{name} already exists")
+    def __init__(self, subject: Subject) -> None:
+        self.subject = subject
+        super().__init__(subject=subject.key())
 
 
 class RecordRevisionConflict(ServiceError):
     grpc_code = grpc.StatusCode.ABORTED
 
-    def __init__(self, type_: str, tradespace: str, name: str) -> None:
-        self.type = type_
-        self.tradespace = tradespace
-        self.name = name
-        super().__init__(f"record {type_}/{tradespace}/{name} revision conflict")
+    def __init__(self, subject: Subject) -> None:
+        self.subject = subject
+        super().__init__(subject=subject.key())
 
 
 class TickNotFound(ServiceError):
@@ -43,14 +45,14 @@ class TickNotFound(ServiceError):
 
     def __init__(self, name: str) -> None:
         self.name = name
-        super().__init__(f"tick {name!r} not found")
+        super().__init__(name=name)
 
 
 class InsufficientBalance(ServiceError):
     grpc_code = grpc.StatusCode.FAILED_PRECONDITION
 
-    def __init__(self, principal: str, currency: str, amount) -> None:
+    def __init__(self, principal: str, currency: str, amount: Decimal) -> None:
         self.principal = principal
         self.currency = currency
         self.amount = amount
-        super().__init__(f"principal {principal!r} has insufficient {currency} balance for {amount}")
+        super().__init__(principal=principal, currency=currency, amount=str(amount))
