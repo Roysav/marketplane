@@ -33,7 +33,7 @@ async def _run(settings: Settings) -> None:
         await PostgresMigrationClient(conn, records_migrations(), "records_schema_migrations").apply()
 
     service = Service(
-        ticks=TicksClient(RedisTickStorage(redis.from_url(settings.ticks.storage.redis.connection_uri))),
+        ticks=TicksClient(RedisTickStorage(redis.from_url(settings.ticks.storage.redis.connection_uri, socket_timeout=None))),
         events=EventsClient(RedisEventStorage(redis.from_url(settings.events.storage.redis.connection_uri, socket_timeout=None))),
         ledger=LedgerClient(PostgresLedgerStorage(ledger_pool)),
         records=RecordsClient(PostgresRecordStorage(records_pool)),
