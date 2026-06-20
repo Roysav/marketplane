@@ -31,13 +31,22 @@ class OrderReconciler:
     async def _reconcile(self, n: RecordNotification) -> None:
         record = await self._client.get_record(ORDER_TYPE, n.record.tradespace, n.record.name)
         order = PolymarketOrderRecord.model_validate(record.spec)
-        if not order.spec.active or order.status.phase is not OrderPhase.pending:
+        owner = record.labels.get(OWNER_LABEL)
+        if owner is not None and owner != self._owner and time.time() < float(record.labels.get(LEASE_LABEL, "0")):
+            return
+        if not order.spec.active:
+            if order.status.phase is OrderPhase.placed:
+                async with self._client.ownership(record, owner=self._owner, until=time.time() + self._lease) as owned:
+                    await asyncio.to_thread(self._clob.cancel_orders, [order.status.polymarket_order_id])
+                    cancelled = order.status.model_copy(update={"phase": OrderPhase.cancelled})
+                    owned = replace(owned, revision=owned.revision + 1, spec=PolymarketOrderRecord(spec=order.spec, status=cancelled).model_dump(by_alias=True, mode="json"))
+                    await self._client.update_record(owned)
+                logger.info("cancelled polymarket order %s for %s/%s", order.status.polymarket_order_id, record.tradespace, record.name)
+            return
+        if order.status.phase is not OrderPhase.pending:
             return
         if order.spec.signature is not None:
             logger.warning("order %s/%s already signed but unconfirmed; leaving for recovery", record.tradespace, record.name)
-            return
-        owner = record.labels.get(OWNER_LABEL)
-        if owner is not None and owner != self._owner and time.time() < float(record.labels.get(LEASE_LABEL, "0")):
             return
         async with self._client.ownership(record, owner=self._owner, until=time.time() + self._lease) as owned:
             args = OrderArgs(

@@ -80,3 +80,44 @@ async def test_resync_polls_get_order(stub):
     order = await _order(client, "o3")
     assert order.status.filled == Decimal(7)
     assert order.status.api_status == "MATCHED"
+
+
+# verbatim from Polymarket's documented /ws/user "order" event payload
+_ORDER_EVENT = {
+    "asset_id": "52114319501245915516055106046884209969926127482827954674443846427813813222426",
+    "associate_trades": None,
+    "event_type": "order",
+    "id": "0xff354cd7ca7539dfa9c28d90943ab5779a4eac34b9b37a757d7b32bdfb11790b",
+    "market": "0xbd31dc8a20211944f6b70f31557f1001557b59905b7738480ca09bd4532f84af",
+    "order_owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+    "original_size": "10",
+    "outcome": "YES",
+    "owner": "9180014b-33c8-9240-a14b-bdca11c0a465",
+    "price": "0.57",
+    "side": "SELL",
+    "size_matched": "0",
+    "timestamp": "1672290687",
+    "type": "PLACEMENT",
+}
+
+
+class FakeChannel:
+    def __init__(self, events: list) -> None:
+        self._events = events
+
+    async def events(self):
+        for event in self._events:
+            yield event
+
+
+async def test_run_parses_documented_user_order_event(stub):
+    client = MarketplaneClient(stub)
+    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0)
+    reconciler = StatusReconciler(controller, client, FakeClob(), FakeChannel([_ORDER_EVENT]), tradespace="polymarket", interval=60.0)
+    await client.create_record(_placed_record("ows", _ORDER_EVENT["id"]))
+
+    await reconciler.run()
+
+    order = await _order(client, "ows")
+    assert order.status.filled == Decimal(0)
+    assert order.status.api_status == "PLACEMENT"

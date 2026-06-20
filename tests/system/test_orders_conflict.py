@@ -1,5 +1,6 @@
 import asyncio
 import time
+from dataclasses import replace
 from decimal import Decimal
 from types import SimpleNamespace
 
@@ -19,6 +20,7 @@ from sdk import LEASE_LABEL, OWNER_LABEL, MarketplaneClient, Record
 class FakeClob:
     def __init__(self) -> None:
         self.posts = 0
+        self.cancels: list[str] = []
 
     def create_order(self, args):
         return SimpleNamespace(signature="0xsig")
@@ -27,9 +29,13 @@ class FakeClob:
         self.posts += 1
         return {"orderID": f"0xorder{self.posts}"}
 
+    def cancel_orders(self, order_ids):
+        self.cancels.extend(order_ids)
+        return {"canceled": order_ids}
 
-def _order_record(name: str, *, labels: dict | None = None) -> Record:
-    spec = OrderSpec(type=OrderType.gtc, token="TOK", side=OrderSide.buy, size=Decimal(5), price=Decimal("0.1"), active=True)
+
+def _order_record(name: str, *, active: bool = True, labels: dict | None = None) -> Record:
+    spec = OrderSpec(type=OrderType.gtc, token="TOK", side=OrderSide.buy, size=Decimal(5), price=Decimal("0.1"), active=active)
     return Record(
         type=ORDER_TYPE,
         tradespace="polymarket",
@@ -107,3 +113,36 @@ async def test_concurrent_reconcilers_one_wins(stub):
     assert sum(isinstance(r, Exception) for r in results) == 1
     assert clob_a.posts + clob_b.posts == 1
     assert (await _order(client, "o4")).status.phase is OrderPhase.placed
+
+
+async def test_reconcile_cancels_when_deactivated(stub):
+    client = MarketplaneClient(stub)
+    clob = FakeClob()
+    reconciler = _reconciler(client, clob)
+    await client.create_record(_order_record("o5"))
+    await reconciler._reconcile(_note(await client.get_record(ORDER_TYPE, "polymarket", "o5")))
+    placed = await client.get_record(ORDER_TYPE, "polymarket", "o5")
+    order = PolymarketOrderRecord.model_validate(placed.spec)
+    order_id = order.status.polymarket_order_id
+
+    deactivated = order.spec.model_copy(update={"active": False})
+    await client.update_record(replace(placed, revision=placed.revision + 1, spec=PolymarketOrderRecord(spec=deactivated, status=order.status).model_dump(by_alias=True, mode="json")))
+    await reconciler._reconcile(_note(await client.get_record(ORDER_TYPE, "polymarket", "o5")))
+
+    final = await _order(client, "o5")
+    assert final.status.phase is OrderPhase.cancelled
+    assert clob.cancels == [order_id]
+
+
+async def test_reconcile_inactive_pending_is_noop(stub):
+    client = MarketplaneClient(stub)
+    clob = FakeClob()
+    reconciler = _reconciler(client, clob)
+    await client.create_record(_order_record("o6", active=False))
+
+    await reconciler._reconcile(_note(await client.get_record(ORDER_TYPE, "polymarket", "o6")))
+
+    order = await _order(client, "o6")
+    assert order.status.phase is OrderPhase.pending
+    assert clob.posts == 0
+    assert clob.cancels == []
