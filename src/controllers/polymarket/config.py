@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -15,11 +15,12 @@ class MarketplaneConfig(BaseModel):
 class ControllerConfig(BaseModel):
     reconnect_backoff: float = Field(alias="reconnectBackoff")
     resync_interval: float = Field(alias="resyncInterval")
+    idle_timeout: float = Field(alias="idleTimeout")
 
 
 class SignerConfig(BaseModel):
     private_key: str = Field(alias="privateKey")
-    signature_type: str = Field(alias="signatureType")
+    signature_type: Literal["EOA", "POLY_PROXY", "POLY_GNOSIS_SAFE"] = Field(alias="signatureType")
     funder: str
 
 

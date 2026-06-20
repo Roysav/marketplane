@@ -3,7 +3,6 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Protocol
 
-from pydantic.experimental import arguments_schema
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 

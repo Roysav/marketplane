@@ -5,6 +5,7 @@ from dataclasses import replace
 from decimal import Decimal
 from uuid import uuid4
 
+import grpc
 from grpc.aio import AioRpcError
 from py_clob_client_v2 import ClobClient, OrderArgs
 
@@ -32,7 +33,7 @@ class OrderReconciler:
         record = await self._client.get_record(ORDER_TYPE, n.record.tradespace, n.record.name)
         order = PolymarketOrderRecord.model_validate(record.spec)
         owner = record.labels.get(OWNER_LABEL)
-        if owner is not None and owner != self._owner and time.time() < float(record.labels.get(LEASE_LABEL, "0")):
+        if owner is not None and owner != self._owner and time.time() < float(record.labels[LEASE_LABEL]):
             return
         if not order.spec.active:
             if order.status.phase is OrderPhase.placed:
@@ -111,4 +112,6 @@ class StatusReconciler:
             try:
                 await self._client.update_record(updated)
             except AioRpcError as err:
-                logger.warning("status update for %s conflicted; retrying on next event", order_id, exc_info=err)
+                if err.code() is not grpc.StatusCode.ABORTED:
+                    raise
+                logger.debug("status update for %s lost a revision race; retrying on the next event or resync", order_id, exc_info=err)

@@ -36,10 +36,11 @@ _RECORD_ACTIONS = frozenset({
 
 
 class Controller:
-    def __init__(self, client: MarketplaneClient, *, reconnect_backoff: float, resync_interval: float):
+    def __init__(self, client: MarketplaneClient, *, reconnect_backoff: float, resync_interval: float, idle_timeout: float):
         self._client = client
         self._reconnect_backoff = reconnect_backoff
         self._resync_interval = resync_interval
+        self._idle_timeout = idle_timeout
         self._registry = HandlerRegistry()
         self._record_types: set[str] = set()
         self._resync_types: set[str] = set()
@@ -116,7 +117,7 @@ class Controller:
 
     async def run(self) -> None:
         scheduler = Scheduler(exception_handler=self._on_worker_error)
-        multiplexer = Multiplexer(scheduler=scheduler, registry=self._registry)
+        multiplexer = Multiplexer(scheduler=scheduler, registry=self._registry, idle_timeout=self._idle_timeout)
         feeders = [
             asyncio.create_task(
                 self._feed(
@@ -185,5 +186,8 @@ class Controller:
 
     async def _schedule_loop(self, interval: float, handler: Callable[[], Awaitable[None]]) -> None:
         while True:
-            await handler()
+            try:
+                await handler()
+            except Exception as err:
+                logger.exception("scheduled handler failed", exc_info=err)
             await asyncio.sleep(interval)

@@ -46,7 +46,7 @@ def _order_record(name: str, *, active: bool = True, labels: dict | None = None)
 
 
 def _reconciler(client: MarketplaneClient, clob: FakeClob) -> OrderReconciler:
-    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0)
+    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0, idle_timeout=60.0)
     return OrderReconciler(controller, client, clob, tradespace="polymarket", lease=120.0)
 
 

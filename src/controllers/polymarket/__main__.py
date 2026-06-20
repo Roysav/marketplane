@@ -33,6 +33,7 @@ async def _run(settings: Settings) -> None:
             client,
             reconnect_backoff=settings.controller.reconnect_backoff,
             resync_interval=settings.controller.resync_interval,
+            idle_timeout=settings.controller.idle_timeout,
         )
         channel = MarketChannel(settings.polymarket.market_channel_url, PricePublisher(client).on_message, max_assets=settings.polymarket.max_assets, ping_timeout=settings.polymarket.ping_timeout)
         api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size, max_concurrency=settings.polymarket.max_concurrency)

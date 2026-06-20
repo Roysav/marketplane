@@ -35,7 +35,7 @@ def _placed_record(name: str, order_id: str) -> Record:
 
 
 def _reconciler(client: MarketplaneClient, clob: FakeClob) -> StatusReconciler:
-    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0)
+    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0, idle_timeout=60.0)
     return StatusReconciler(controller, client, clob, None, tradespace="polymarket", interval=60.0)
 
 
@@ -112,7 +112,7 @@ class FakeChannel:
 
 async def test_run_parses_documented_user_order_event(stub):
     client = MarketplaneClient(stub)
-    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0)
+    controller = Controller(client, reconnect_backoff=1.0, resync_interval=60.0, idle_timeout=60.0)
     reconciler = StatusReconciler(controller, client, FakeClob(), FakeChannel([_ORDER_EVENT]), tradespace="polymarket", interval=60.0)
     await client.create_record(_placed_record("ows", _ORDER_EVENT["id"]))
 

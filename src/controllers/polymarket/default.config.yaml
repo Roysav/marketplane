@@ -24,6 +24,7 @@ marketplane:
 controller:
   reconnectBackoff: 1.0
   resyncInterval: 30.0
+  idleTimeout: 120.0
 
 polymarket:
   marketChannelUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/market"

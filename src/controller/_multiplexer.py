@@ -20,9 +20,10 @@ _Item = BaseNotification | _EOS
 
 
 class Multiplexer:
-    def __init__(self, *, scheduler: Scheduler, registry: HandlerRegistry):
+    def __init__(self, *, scheduler: Scheduler, registry: HandlerRegistry, idle_timeout: float):
         self._scheduler = scheduler
         self._registry = registry
+        self._idle_timeout = idle_timeout
         self._streams: dict[Hashable, asyncio.Queue[_Item]] = {}
 
     async def feed(self, notification: BaseNotification) -> None:
@@ -35,15 +36,22 @@ class Multiplexer:
         queue.put_nowait(notification)
 
     async def drain(self) -> None:
-        for queue in self._streams.values():
+        for queue in list(self._streams.values()):
             queue.put_nowait(EOS)
         await self._scheduler.wait()
 
     async def _worker(self, key: Hashable) -> None:
         queue = self._streams[key]
         while True:
-            item = await queue.get()
+            try:
+                item = await asyncio.wait_for(queue.get(), self._idle_timeout)
+            except asyncio.TimeoutError:
+                if queue.empty():
+                    del self._streams[key]
+                    return
+                continue
             if item is EOS:
+                del self._streams[key]
                 return
             await self._dispatch(item)
 

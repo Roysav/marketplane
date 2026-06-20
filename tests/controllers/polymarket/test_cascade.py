@@ -47,7 +47,7 @@ def _fixtures():
 
 async def test_cron_imports_events_then_cascades_to_asset_subscription(client):
     channel = FakeChannel()
-    controller = Controller(client, reconnect_backoff=0.01, resync_interval=0.03)
+    controller = Controller(client, reconnect_backoff=0.01, resync_interval=0.03, idle_timeout=60.0)
     event, market = _fixtures()
     api = FakeAPI([event], [market])
 
@@ -80,7 +80,7 @@ class BoomAPI:
 
 
 async def test_import_logs_and_continues_on_api_error(client):
-    controller = Controller(client, reconnect_backoff=0.01, resync_interval=10.0)
+    controller = Controller(client, reconnect_backoff=0.01, resync_interval=10.0, idle_timeout=60.0)
     importer = EventImporter(controller, client, BoomAPI(), tradespace=TRADESPACE, interval=10.0)
     await importer._import()
     assert client.of_type(EVENT_TYPE) == []

@@ -37,7 +37,7 @@ def _record(name, labels=None, revision=0):
 
 
 def _controller(client) -> Controller:
-    return Controller(client, reconnect_backoff=0.01, resync_interval=0.05)
+    return Controller(client, reconnect_backoff=0.01, resync_interval=0.05, idle_timeout=60.0)
 
 
 async def _run_until(ctrl, done, timeout=2.0):

@@ -26,7 +26,7 @@ def _build(handler: Handler):
     registry = HandlerRegistry()
     registry.register(handler, Selector(types=_ALL_RECORD, record_type="asset"))
     scheduler = Scheduler(exception_handler=_reraise)
-    mux = Multiplexer(scheduler=scheduler, registry=registry)
+    mux = Multiplexer(scheduler=scheduler, registry=registry, idle_timeout=60.0)
     return mux, scheduler
 
 
@@ -78,3 +78,22 @@ async def test_drain_processes_backlog():
         await mux.feed(_note(name=name))
     await mux.drain()
     assert sorted(seen) == ["A", "B", "C"]
+
+
+async def test_idle_worker_is_evicted():
+    async def handler(_: RecordNotification) -> None:
+        pass
+
+    registry = HandlerRegistry()
+    registry.register(handler, Selector(types=_ALL_RECORD, record_type="asset"))
+    scheduler = Scheduler(exception_handler=_reraise)
+    mux = Multiplexer(scheduler=scheduler, registry=registry, idle_timeout=0.05)
+
+    await mux.feed(_note())
+    for _ in range(50):
+        await asyncio.sleep(0.02)
+        if not mux._streams:
+            break
+
+    assert mux._streams == {}
+    await mux.drain()
