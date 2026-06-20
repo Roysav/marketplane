@@ -64,7 +64,7 @@ async def _await_placed(client: MarketplaneClient, tradespace: str, name: str, *
 async def test_order_record_places_order_on_polymarket(stub, poly, clob):
     client = MarketplaneClient(stub)
     controller = Controller(client, reconnect_backoff=0.1, resync_interval=0.5)
-    OrderReconciler(controller, client, clob, tradespace=poly.tradespace)
+    OrderReconciler(controller, client, clob, tradespace=poly.tradespace, lease=poly.order_lease)
     run = asyncio.create_task(controller.run())
     order_id: str | None = None
     try:

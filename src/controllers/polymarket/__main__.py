@@ -42,7 +42,7 @@ async def _run(settings: Settings) -> None:
         MarketReconciler(controller, client, tradespace=tradespace)
         EventReconciler(controller, client, api, tradespace=tradespace)
         EventImporter(controller, client, api, tradespace=tradespace, interval=settings.polymarket.cron_interval)
-        OrderReconciler(controller, client, clob, tradespace=tradespace)
+        OrderReconciler(controller, client, clob, tradespace=tradespace, lease=settings.polymarket.order_lease)
 
         await asyncio.gather(channel.run(), controller.run())
 

@@ -31,6 +31,7 @@ polymarket:
   clobApiUrl: "https://clob.polymarket.com"
   chainId: 137
   tradespace: polymarket
+  orderLease: 120.0
   cronInterval: 60.0
   pageSize: 100
   maxConcurrency: 10

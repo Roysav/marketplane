@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import time
 from dataclasses import replace
 from uuid import uuid4
 
 from py_clob_client_v2 import ClobClient, OrderArgs
 
 from controller import Controller, RecordNotification
-from sdk import MarketplaneClient, Record
+from sdk import LEASE_LABEL, OWNER_LABEL, MarketplaneClient, Record
 
 from .types import ORDER_TYPE, OrderPhase, PolymarketOrderRecord
 
@@ -16,9 +17,10 @@ SIGNATURE_LABEL = "polymarket.io/signature"
 
 
 class OrderReconciler:
-    def __init__(self, controller: Controller, client: MarketplaneClient, clob: ClobClient, *, tradespace: str):
+    def __init__(self, controller: Controller, client: MarketplaneClient, clob: ClobClient, *, tradespace: str, lease: float):
         self._client = client
         self._clob = clob
+        self._lease = lease
         self._owner = uuid4().hex
         controller.on_existing(ORDER_TYPE, tradespace=tradespace)(self._reconcile)
 
@@ -30,7 +32,10 @@ class OrderReconciler:
         if order.spec.signature is not None:
             logger.warning("order %s/%s already signed but unconfirmed; leaving for recovery", record.tradespace, record.name)
             return
-        async with self._client.ownership(record, self._owner) as owned:
+        owner = record.labels.get(OWNER_LABEL)
+        if owner is not None and owner != self._owner and time.time() < float(record.labels.get(LEASE_LABEL, "0")):
+            return
+        async with self._client.ownership(record, owner=self._owner, until=time.time() + self._lease) as owned:
             args = OrderArgs(
                 token_id=order.spec.token,
                 price=float(order.spec.price),

@@ -69,6 +69,7 @@ def _record_from_proto(r: apiserver_pb2.Record) -> Record:
 
 
 OWNER_LABEL = "marketplane.io/owner"
+LEASE_LABEL = "marketplane.io/lease"
 
 
 class MarketplaneClient:
@@ -115,8 +116,8 @@ class MarketplaneClient:
         await self._client.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_record_to_proto(record)))
 
     @asynccontextmanager
-    async def ownership(self, record: Record, owner: str) -> AsyncIterator[Record]:
-        claimed = replace(record, labels={**record.labels, OWNER_LABEL: owner}, revision=record.revision + 1)
+    async def ownership(self, record: Record, *, owner: str, until: float) -> AsyncIterator[Record]:
+        claimed = replace(record, labels={**record.labels, OWNER_LABEL: owner, LEASE_LABEL: repr(until)}, revision=record.revision + 1)
         await self.update_record(claimed)
         yield claimed
 

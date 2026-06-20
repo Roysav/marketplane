@@ -29,6 +29,7 @@ class PolymarketConfig(BaseModel):
     clob_api_url: str = Field(alias="clobApiUrl")
     chain_id: int = Field(alias="chainId")
     tradespace: str
+    order_lease: float = Field(alias="orderLease")
     cron_interval: float = Field(alias="cronInterval")
     page_size: int = Field(alias="pageSize")
     max_concurrency: int = Field(alias="maxConcurrency")
