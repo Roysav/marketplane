@@ -25,6 +25,7 @@ class SignerConfig(BaseModel):
 
 class PolymarketConfig(BaseModel):
     market_channel_url: str = Field(alias="marketChannelUrl")
+    user_channel_url: str = Field(alias="userChannelUrl")
     gamma_api_url: str = Field(alias="gammaApiUrl")
     clob_api_url: str = Field(alias="clobApiUrl")
     chain_id: int = Field(alias="chainId")

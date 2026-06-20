@@ -27,6 +27,7 @@ controller:
 
 polymarket:
   marketChannelUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+  userChannelUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/user"
   gammaApiUrl: "https://gamma-api.polymarket.com"
   clobApiUrl: "https://clob.polymarket.com"
   chainId: 137

@@ -57,6 +57,8 @@ class OrderStatus(_Model):
     approved: bool = False
     phase: OrderPhase = OrderPhase.pending
     polymarket_order_id: str | None = None
+    filled: Decimal = Decimal(0)
+    api_status: str | None = None
     last_error: str | None = None
 
 
