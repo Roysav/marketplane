@@ -36,6 +36,7 @@ class PolymarketConfig(BaseModel):
     max_concurrency: int = Field(alias="maxConcurrency")
     max_assets: int = Field(alias="maxAssets")
     ping_timeout: float = Field(alias="pingTimeout")
+    ping_interval: float = Field(alias="pingInterval")
     signer: SignerConfig
 
 

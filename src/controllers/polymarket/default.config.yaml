@@ -38,3 +38,4 @@ polymarket:
   maxConcurrency: 10
   maxAssets: 10000
   pingTimeout: 30.0
+  pingInterval: 10.0

@@ -37,7 +37,7 @@ async def _run(settings: Settings) -> None:
         channel = MarketChannel(settings.polymarket.market_channel_url, PricePublisher(client).on_message, max_assets=settings.polymarket.max_assets, ping_timeout=settings.polymarket.ping_timeout)
         api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size, max_concurrency=settings.polymarket.max_concurrency)
         clob = await asyncio.to_thread(build_clob_client, settings.polymarket.clob_api_url, settings.polymarket.chain_id, settings.polymarket.signer)
-        user_channel = UserChannel(settings.polymarket.user_channel_url, clob.creds.api_key, clob.creds.api_secret, clob.creds.api_passphrase, ping_timeout=settings.polymarket.ping_timeout)
+        user_channel = UserChannel(settings.polymarket.user_channel_url, clob.creds.api_key, clob.creds.api_secret, clob.creds.api_passphrase, ping_interval=settings.polymarket.ping_interval, ping_timeout=settings.polymarket.ping_timeout)
 
         tradespace = settings.polymarket.tradespace
         AssetSubscriber(controller, channel, tradespace=tradespace)
