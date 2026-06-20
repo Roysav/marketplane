@@ -1,12 +1,12 @@
 from .api import Event, Market, PolymarketAPI
 from .channel import Channel, MarketChannel
 from .config import Settings
+from .orders import OrderReconciler
 from .prices import ASSET_PRICE_TICK, PricePublisher
 from .reconcilers import (
     ASSET_TYPE,
     EVENT_TYPE,
     MARKET_TYPE,
-    TRADESPACE,
     AssetSubscriber,
     EventImporter,
     EventReconciler,
@@ -24,10 +24,10 @@ __all__ = [
     "MarketReconciler",
     "EventReconciler",
     "EventImporter",
+    "OrderReconciler",
     "PricePublisher",
     "ASSET_TYPE",
     "MARKET_TYPE",
     "EVENT_TYPE",
-    "TRADESPACE",
     "ASSET_PRICE_TICK",
 ]

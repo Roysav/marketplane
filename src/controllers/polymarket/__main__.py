@@ -10,7 +10,9 @@ from controllers.polymarket.api import PolymarketAPI
 from controllers.polymarket.channel import MarketChannel
 from controllers.polymarket.config import Settings
 from controllers.polymarket.prices import PricePublisher
+from controllers.polymarket.orders import OrderReconciler
 from controllers.polymarket.reconcilers import AssetSubscriber, EventImporter, EventReconciler, MarketReconciler
+from controllers.polymarket.signer import build_clob_client
 from sdk import MarketplaneClient
 
 logger = logging.getLogger("controllers.polymarket")
@@ -33,11 +35,14 @@ async def _run(settings: Settings) -> None:
         )
         channel = MarketChannel(settings.polymarket.market_channel_url, PricePublisher(client).on_message, max_assets=settings.polymarket.max_assets, ping_timeout=settings.polymarket.ping_timeout)
         api = PolymarketAPI(http_client, page_size=settings.polymarket.page_size, max_concurrency=settings.polymarket.max_concurrency)
+        clob = await asyncio.to_thread(build_clob_client, settings.polymarket.clob_api_url, settings.polymarket.chain_id, settings.polymarket.signer)
 
-        AssetSubscriber(controller, channel)
-        MarketReconciler(controller, client)
-        EventReconciler(controller, client, api)
-        EventImporter(controller, client, api, interval=settings.polymarket.cron_interval)
+        tradespace = settings.polymarket.tradespace
+        AssetSubscriber(controller, channel, tradespace=tradespace)
+        MarketReconciler(controller, client, tradespace=tradespace)
+        EventReconciler(controller, client, api, tradespace=tradespace)
+        EventImporter(controller, client, api, tradespace=tradespace, interval=settings.polymarket.cron_interval)
+        OrderReconciler(controller, client, clob, tradespace=tradespace)
 
         await asyncio.gather(channel.run(), controller.run())
 

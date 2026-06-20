@@ -3,6 +3,7 @@ import logging
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Protocol
 
+from pydantic.experimental import arguments_schema
 from websockets.asyncio.client import ClientConnection, connect
 from websockets.exceptions import ConnectionClosed
 
@@ -67,8 +68,9 @@ class MarketChannel:
                 async for message in ws:
                     try:
                         await self._on_message(message)
-                    except Exception:
-                        logger.exception("market channel message handler failed")
-            except ConnectionClosed:
-                logger.warning("market channel disconnected; reconnecting")
+                    except Exception as err:
+                        err.add_note(f"While processing {message=!r}")
+                        logger.exception("market channel message handler failed", exc_info=err)
+            except ConnectionClosed as connection_close_err:
+                logger.warning("market channel disconnected; reconnecting", exc_info=connection_close_err)
             self._ws = None

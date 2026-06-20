@@ -174,8 +174,7 @@ class Controller:
                 async for item in make_stream():
                     await multiplexer.feed(parse(item))
             except AioRpcError as err:
-                err.add_note(f"while handling {label!r}")
-                logger.exception(err)
+                logger.exception("feed %r failed; reconnecting", label, exc_info=err)
                 await asyncio.sleep(self._reconnect_backoff)
 
     async def _list_loop(self, type_: str) -> AsyncIterator[Record]:

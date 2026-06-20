@@ -52,4 +52,4 @@ class Multiplexer:
             try:
                 await handler(notification)
             except Exception as err:
-                logger.exception(err)
+                logger.exception("handler failed for %r", notification.key, exc_info=err)

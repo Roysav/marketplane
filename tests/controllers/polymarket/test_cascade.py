@@ -13,6 +13,10 @@ from controllers.polymarket.reconcilers import (
     EventReconciler,
     MarketReconciler,
 )
+
+TRADESPACE = "polymarket"
+
+
 class FakeAPI:
     def __init__(self, events, markets):
         self._events = events
@@ -47,10 +51,10 @@ async def test_cron_imports_events_then_cascades_to_asset_subscription(client):
     event, market = _fixtures()
     api = FakeAPI([event], [market])
 
-    AssetSubscriber(controller, channel)
-    MarketReconciler(controller, client)
-    EventReconciler(controller, client, api)
-    EventImporter(controller, client, api, interval=10.0)
+    AssetSubscriber(controller, channel, tradespace=TRADESPACE)
+    MarketReconciler(controller, client, tradespace=TRADESPACE)
+    EventReconciler(controller, client, api, tradespace=TRADESPACE)
+    EventImporter(controller, client, api, tradespace=TRADESPACE, interval=10.0)
 
     task = asyncio.create_task(controller.run())
     for _ in range(100):
@@ -77,6 +81,6 @@ class BoomAPI:
 
 async def test_import_logs_and_continues_on_api_error(client):
     controller = Controller(client, reconnect_backoff=0.01, resync_interval=10.0)
-    importer = EventImporter(controller, client, BoomAPI(), interval=10.0)
+    importer = EventImporter(controller, client, BoomAPI(), tradespace=TRADESPACE, interval=10.0)
     await importer._import()
     assert client.of_type(EVENT_TYPE) == []

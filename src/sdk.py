@@ -1,6 +1,7 @@
 import json
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field, replace
 from decimal import Decimal
 from typing import Any
 
@@ -67,6 +68,9 @@ def _record_from_proto(r: apiserver_pb2.Record) -> Record:
     )
 
 
+OWNER_LABEL = "marketplane.io/owner"
+
+
 class MarketplaneClient:
     def __init__(self, grpc_client: apiserver_pb2_grpc.ApiserverServiceStub) -> None:
         self._client = grpc_client
@@ -109,6 +113,12 @@ class MarketplaneClient:
 
     async def update_record(self, record: Record) -> None:
         await self._client.UpdateRecord(apiserver_pb2.UpdateRecordRequest(record=_record_to_proto(record)))
+
+    @asynccontextmanager
+    async def ownership(self, record: Record, owner: str) -> AsyncIterator[Record]:
+        claimed = replace(record, labels={**record.labels, OWNER_LABEL: owner}, revision=record.revision + 1)
+        await self.update_record(claimed)
+        yield claimed
 
     async def apply_record(self, record: Record) -> None:
         await self._client.ApplyRecord(apiserver_pb2.ApplyRecordRequest(record=_record_to_proto(record)))

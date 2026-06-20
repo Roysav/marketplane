@@ -28,6 +28,9 @@ controller:
 polymarket:
   marketChannelUrl: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
   gammaApiUrl: "https://gamma-api.polymarket.com"
+  clobApiUrl: "https://clob.polymarket.com"
+  chainId: 137
+  tradespace: polymarket
   cronInterval: 60.0
   pageSize: 100
   maxConcurrency: 10

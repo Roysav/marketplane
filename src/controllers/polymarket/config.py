@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any
 
@@ -18,14 +17,24 @@ class ControllerConfig(BaseModel):
     resync_interval: float = Field(alias="resyncInterval")
 
 
+class SignerConfig(BaseModel):
+    private_key: str = Field(alias="privateKey")
+    signature_type: str = Field(alias="signatureType")
+    funder: str
+
+
 class PolymarketConfig(BaseModel):
     market_channel_url: str = Field(alias="marketChannelUrl")
     gamma_api_url: str = Field(alias="gammaApiUrl")
+    clob_api_url: str = Field(alias="clobApiUrl")
+    chain_id: int = Field(alias="chainId")
+    tradespace: str
     cron_interval: float = Field(alias="cronInterval")
     page_size: int = Field(alias="pageSize")
     max_concurrency: int = Field(alias="maxConcurrency")
     max_assets: int = Field(alias="maxAssets")
     ping_timeout: float = Field(alias="pingTimeout")
+    signer: SignerConfig
 
 
 class Settings(BaseSettings):
@@ -43,11 +52,8 @@ class Settings(BaseSettings):
     def settings_customise_sources(
         cls,
         settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
+        **kwargs: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         default_path = Path(__file__).parent / "default.config.yaml"
-        override_path = Path(os.environ.get("MARKETPLANE_POLYMARKET_CONTROLLER_CONFIG_FILE", "local.polymarket.config.yaml"))
-        return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)
+        return layered_yaml_sources(settings_cls, default_path=default_path, env_settings=env_settings)

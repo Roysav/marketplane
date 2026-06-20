@@ -17,6 +17,7 @@ dependencies = [
     "pydantic-settings[yaml]>=2.3",
     "websockets>=13",
     "httpx>=0.27",
+    "py-clob-client-v2>=1.0",
 ]
 
 [project.optional-dependencies]
@@ -34,4 +35,7 @@ namespaces = true
 asyncio_mode = "auto"
 pythonpath = ["src", "gen"]
 testpaths = ["tests"]
-markers = ["integration: tests that hit real Postgres/Redis"]
+markers = [
+    "integration: tests that hit real Postgres/Redis",
+    "system: live Polymarket CLOB tests (place real orders; need secrets/)",
+]
