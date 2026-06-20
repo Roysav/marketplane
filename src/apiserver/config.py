@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+import pydantic
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
@@ -9,11 +10,11 @@ from utils.config import layered_yaml_sources
 
 
 class PostgresConfig(BaseModel):
-    connection_uri: str = Field(alias="connectionUri")
+    connection_uri: pydantic.PostgresDsn = Field(alias="connectionUri")
 
 
 class RedisConfig(BaseModel):
-    connection_uri: str = Field(alias="connectionUri")
+    connection_uri: pydantic.RedisDsn = Field(alias="connectionUri")
     socket_timeout: float | None = Field(alias="socketTimeout")
 
 
@@ -44,7 +45,7 @@ class TicksSettings(BaseModel):
 
 
 class ServerConfig(BaseModel):
-    address: str
+    address: pydantic.IPvAnyAddress
     max_message_bytes: int = Field(alias="maxMessageBytes")
 
 
