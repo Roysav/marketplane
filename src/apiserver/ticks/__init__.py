@@ -22,8 +22,8 @@ class TicksClient:
     async def get(self, name: str) -> Any:
         try:
             raw = await self._backend.get(name)
-        except KeyNotFound:
-            raise TickNotFound(name)
+        except KeyNotFound as err:
+            raise TickNotFound(name) from err
         return json.loads(raw)
 
     async def subscribe(self, name: str) -> AsyncIterator[Any]:

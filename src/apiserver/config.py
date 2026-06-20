@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from typing import Any, Literal
 
@@ -45,7 +44,7 @@ class TicksSettings(BaseModel):
 
 
 class ServerConfig(BaseModel):
-    address: pydantic.IPvAnyAddress
+    address: str
     max_message_bytes: int = Field(alias="maxMessageBytes")
 
 
@@ -66,11 +65,8 @@ class Settings(BaseSettings):
     def settings_customise_sources(
         cls,
         settings_cls: type[BaseSettings],
-        init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
-        dotenv_settings: PydanticBaseSettingsSource,
-        file_secret_settings: PydanticBaseSettingsSource,
+        **kwargs: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         default_path = Path(__file__).parent / "default.config.yaml"
-        override_path = Path(os.environ.get("MARKETPLANE_APISERVER_CONFIG_FILE", "local.apiserver.config.yaml"))
-        return layered_yaml_sources(settings_cls, default_path=default_path, override_path=override_path, env_settings=env_settings)
+        return layered_yaml_sources(settings_cls, default_path=default_path, env_settings=env_settings)

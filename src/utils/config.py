@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 from typing import Any
 
@@ -32,16 +33,22 @@ class _MappingSource(PydanticBaseSettingsSource):
         return self._data
 
 
+def _cli_config_paths() -> list[Path]:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--config", action="append", default=[], dest="config")
+    args, _ = parser.parse_known_args()
+    return [Path(p) for p in args.config]
+
+
 def layered_yaml_sources(
     settings_cls: type[BaseSettings],
     *,
     default_path: Path,
-    override_path: Path,
     env_settings: PydanticBaseSettingsSource,
 ) -> tuple[PydanticBaseSettingsSource, ...]:
     data = _read_yaml(default_path)
-    if override_path.is_file():
-        data = deep_merge(data, _read_yaml(override_path))
+    for path in _cli_config_paths():
+        data = deep_merge(data, _read_yaml(path))
     return (
         CliSettingsSource(settings_cls, cli_parse_args=True, cli_ignore_unknown_args=True),
         env_settings,

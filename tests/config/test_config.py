@@ -1,3 +1,4 @@
+import copy
 import sys
 
 import pytest
@@ -6,7 +7,7 @@ from pydantic import ValidationError
 
 from apiserver.config import Settings
 
-_LOCAL = {
+_CONFIG = {
     "server":  {"address": "10.0.0.1:9000"},
     "ledger":  {"storage": {"postgres": {"connectionUri": "postgresql://localhost/ledger"}}},
     "records": {"storage": {"postgres": {"connectionUri": "postgresql://localhost/records"}}},
@@ -15,10 +16,10 @@ _LOCAL = {
 }
 
 
-def _write(tmp_path, cfg):
-    f = tmp_path / "apiserver.config.yaml"
+def _write(tmp_path, cfg, name="config.yaml"):
+    f = tmp_path / name
     f.write_text(yaml.dump(cfg))
-    return f
+    return str(f)
 
 
 @pytest.fixture(autouse=True)
@@ -30,65 +31,72 @@ def isolate(monkeypatch):
 
 
 @pytest.fixture
-def local(tmp_path, monkeypatch):
-    f = _write(tmp_path, _LOCAL)
-    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(f))
-    return f
+def config(tmp_path, monkeypatch):
+    path = _write(tmp_path, _CONFIG)
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", path])
+    return path
 
 
-# --- layering: in-module defaults + project-root local override ---
+# --- layering: in-module defaults + --config files ---
 
-def test_local_override_layers_over_in_module_defaults(local):
+def test_config_layers_over_in_module_defaults(config):
     s = Settings()
     assert s.server.address == "10.0.0.1:9000"
-    assert s.ledger.storage.postgres.connection_uri == "postgresql://localhost/ledger"
-    assert s.ticks.storage.redis.connection_uri == "redis://localhost/1"
+    assert str(s.ledger.storage.postgres.connection_uri) == "postgresql://localhost/ledger"
+    assert str(s.ticks.storage.redis.connection_uri) == "redis://localhost:6379/1"
     assert s.server.max_message_bytes == 268435456
     assert s.ledger.storage.backend == "postgres"
     assert s.events.storage.redis.socket_timeout is None
 
 
-def test_committed_local_config_loads_by_default(monkeypatch):
-    s = Settings()
-    assert s.server.address.endswith(":50051")
-    assert s.ledger.storage.backend == "postgres"
-    assert s.ticks.storage.redis.connection_uri.startswith("redis://")
-
-
-def test_missing_local_override_raises(tmp_path, monkeypatch):
-    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(tmp_path / "absent.yaml"))
+def test_defaults_alone_are_incomplete(monkeypatch):
     with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_missing_config_file_raises(tmp_path, monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", str(tmp_path / "absent.yaml")])
+    with pytest.raises(FileNotFoundError):
         Settings()
 
 
 def test_bad_discriminator_raises(tmp_path, monkeypatch):
-    import copy
-    cfg = copy.deepcopy(_LOCAL)
+    cfg = copy.deepcopy(_CONFIG)
     cfg["ledger"]["storage"]["backend"] = "mysql"
-    monkeypatch.setenv("MARKETPLANE_APISERVER_CONFIG_FILE", str(_write(tmp_path, cfg)))
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", _write(tmp_path, cfg)])
     with pytest.raises(ValidationError):
         Settings()
 
 
+def test_multiple_config_files_merge_in_order(tmp_path, monkeypatch):
+    base = _write(tmp_path, _CONFIG, "base.yaml")
+    override = _write(tmp_path, {"ticks": {"storage": {"redis": {"connectionUri": "redis://second/8"}}}}, "override.yaml")
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", base, "--config", override])
+    s = Settings()
+    assert str(s.ticks.storage.redis.connection_uri) == "redis://second:6379/8"
+    assert str(s.ledger.storage.postgres.connection_uri) == "postgresql://localhost/ledger"
+
+
 # --- env ---
 
-def test_env_overrides_local(local, monkeypatch):
+def test_env_overrides_config(config, monkeypatch):
     monkeypatch.setenv("MARKETPLANE_APISERVER_TICKS_STORAGE_REDIS_CONNECTIONURI", "redis://env/9")
     s = Settings()
-    assert s.ticks.storage.redis.connection_uri == "redis://env/9"
-    assert s.ledger.storage.postgres.connection_uri == "postgresql://localhost/ledger"
+    assert str(s.ticks.storage.redis.connection_uri) == "redis://env:6379/9"
+    assert str(s.ledger.storage.postgres.connection_uri) == "postgresql://localhost/ledger"
 
 
-# --- cli ---
+# --- cli field overrides ---
 
-def test_cli_overrides_env_and_local(local, monkeypatch):
+def test_cli_field_overrides_env_and_config(tmp_path, monkeypatch):
+    path = _write(tmp_path, _CONFIG)
     monkeypatch.setenv("MARKETPLANE_APISERVER_TICKS_STORAGE_REDIS_CONNECTIONURI", "redis://env/9")
-    monkeypatch.setattr(sys, "argv", ["prog", "--ticks.storage.redis.connectionUri", "redis://cli/7"])
+    monkeypatch.setattr(sys, "argv", ["prog", "--config", path, "--ticks.storage.redis.connectionUri", "redis://cli/7"])
     s = Settings()
-    assert s.ticks.storage.redis.connection_uri == "redis://cli/7"
+    assert str(s.ticks.storage.redis.connection_uri) == "redis://cli:6379/7"
 
 
-def test_cli_unknown_flags_ignored(local, monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["prog", "--workers", "4", "--host", "0.0.0.0"])
+def test_cli_unknown_flags_ignored(config, monkeypatch):
+    monkeypatch.setattr(sys, "argv", sys.argv + ["--workers", "4", "--host", "0.0.0.0"])
     s = Settings()
-    assert s.ticks.storage.redis.connection_uri == "redis://localhost/1"
+    assert str(s.ticks.storage.redis.connection_uri) == "redis://localhost:6379/1"
