@@ -51,3 +51,5 @@ logs/
 
 # Reference material (cloned upstream repos)
 .context/
+
+secrets/
